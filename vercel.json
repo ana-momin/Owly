@@ -3,7 +3,19 @@
   "regions": ["sin1"],
   "functions": {
     "api/**/*.ts": {
-      "memory": 2048
+      "memory": 2048,
+      "maxDuration": 120,
+      "includeFiles": "node_modules/axe-core/axe.min.js"
     }
-  }
+  },
+  "rewrites": [{ "source": "/r/:id", "destination": "/api/r/:id" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
 }

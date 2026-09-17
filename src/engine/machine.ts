@@ -1,0 +1,530 @@
+/**
+ * A test run as a resumable state machine.
+ *
+ * On Vercel a single invocation may run for 300 seconds at most, and a real
+ * test takes longer. So a run is a list of work items plus everything learned
+ * so far, all plain JSON. Each call to `advance` does as many items as fit in
+ * its time budget and hands back the state; the next call - usually the next
+ * poll from Pond - picks up exactly where it stopped, possibly on a different
+ * instance. Nothing lives in memory between slices.
+ *
+ * That is the lesson of Foxy's first Pond rejection: its scan died after 166
+ * seconds because work depended on an instance staying alive. Here no work
+ * depends on anything but the state in the database.
+ *
+ *   discover  crawl as a new desktop user, running the chosen units on each page
+ *   personas  revisit what was found as a phone user and a keyboard user
+ *   verify    replay every unit that raised a candidate, in a fresh context
+ *   done      cluster, redact, write the report
+ */
+
+import type { Browser } from "playwright-core";
+import { load } from "../config.js";
+import type { Finding } from "../findings.js";
+import { createRedactor } from "../policy/redact.js";
+import { checkUrl, sameOrigin } from "../policy/urlGuard.js";
+import { launchBrowser, PERSONAS, Session, type BlockRecord, type Persona } from "../browser/session.js";
+import { parseUnit, unitKey, type Activity, type Candidate } from "./candidate.js";
+import { cluster, replayKey } from "./cluster.js";
+import { a11yUnit, buttonsUnit, formsUnit, keyboardUnit, layoutUnit, loadUnit, type UnitResult } from "./probes.js";
+
+/**
+ * `full` presses buttons and submits forms. `passive` only looks: it loads
+ * pages, measures layout, runs the accessibility scan and walks focus with Tab.
+ * Only a site whose owner has proven control of it gets `full` (spec §54).
+ */
+export type Mode = "full" | "passive";
+
+/** What the requester asked to concentrate on. Honoured, not decorative. */
+export type Focus = "everything" | "forms" | "mobile" | "accessibility";
+
+export interface RunEvent {
+  at: string;
+  level: "info" | "warn" | "suspect" | "confirmed" | "dismissed";
+  text: string;
+}
+
+type WorkItem = (
+  | { kind: "discover"; url: string; from: string | null; via: string }
+  | { kind: "unit"; persona: Persona["key"]; activity: Activity; url: string }
+  | { kind: "replay"; unit: string }
+) & {
+  /** Failed attempts so far. One retry, then the item is skipped and noted. */
+  tries?: number;
+};
+
+/**
+ * The longest one work item may take. A page can hang an evaluation forever
+ * (an endless script, a stuck render); without this, one bad page ran a slice
+ * past Vercel's function limit and the platform killed it mid-write.
+ */
+export const ITEM_LIMIT_MS = 35_000;
+
+const ACTIVITY_LABEL: Record<Activity, string> = {
+  load: "loading the page",
+  links: "checking links",
+  a11y: "the accessibility scan",
+  layout: "the layout check",
+  buttons: "pressing buttons",
+  forms: "filling in forms",
+  keyboard: "the keyboard check",
+};
+
+type Outcome<T> = { ok: true; value: T } | { ok: false; reason: "timeout" | "error"; error: string; stopSlice: boolean };
+
+/** Resolves within `ms`, whatever `work` does. */
+async function within<T>(work: Promise<T>, ms: number): Promise<T | "timeout"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // An abandoned promise may still reject later; that must not crash anything.
+  work.catch(() => undefined);
+  try {
+    return await Promise.race([work, new Promise<"timeout">((r) => (timer = setTimeout(() => r("timeout"), ms)))]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export interface RunReport {
+  target: string;
+  mode: Mode;
+  focus: Focus;
+  /** The checks that actually ran - so a scoped run can prove its scope. */
+  activities: Activity[];
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  slices: number;
+  findings: Finding[];
+  unverified: Finding[];
+  pages: Array<{ url: string; status: number | null }>;
+  notes: string[];
+  events: RunEvent[];
+}
+
+export interface RunState {
+  v: 1;
+  target: string;
+  mode: Mode;
+  focus: Focus;
+  allowPrivate: boolean;
+  maxPages: number;
+  maxRunMs: number;
+  phase: "discover" | "personas" | "verify" | "done";
+  pending: WorkItem[];
+  pages: Array<[string, number | null]>;
+  referrers: Array<[string, Array<{ from: string; via: string }>]>;
+  candidates: Candidate[];
+  reproduced: string[];
+  blocked: BlockRecord[];
+  notes: string[];
+  events: RunEvent[];
+  activities: Activity[];
+  exploringStopped: boolean;
+  createdAt: string;
+  elapsedMs: number;
+  slices: number;
+  report: RunReport | null;
+}
+
+/** Which checks a mode and focus allow. The single place scope is decided. */
+export function activitiesFor(mode: Mode, focus: Focus): Activity[] {
+  const interactive: Activity[] = mode === "full" ? ["buttons", "forms"] : [];
+  switch (focus) {
+    case "forms":
+      return ["load", "links", ...interactive];
+    case "mobile":
+      return ["load", "links", "layout"];
+    case "accessibility":
+      return ["load", "links", "a11y", "keyboard"];
+    default:
+      return ["load", "links", "a11y", "layout", ...interactive, "keyboard"];
+  }
+}
+
+function normalise(url: string): string {
+  const u = new URL(url);
+  u.hash = "";
+  return u.href;
+}
+
+export interface NewRunOptions {
+  mode: Mode;
+  focus?: Focus;
+  allowPrivate?: boolean;
+  maxPages?: number;
+  maxRunMs?: number;
+}
+
+/** Validates the target before anything is stored. Throws with a reason. */
+export async function newRun(targetUrl: string, opts: NewRunOptions): Promise<RunState> {
+  const config = load();
+  const allowPrivate = opts.allowPrivate ?? config.allowPrivateTargets;
+  const verdict = await checkUrl(targetUrl, { allowPrivate });
+  if (!verdict.ok) throw new Error(verdict.reason);
+  const target = normalise(verdict.url.href);
+  const focus = opts.focus ?? "everything";
+
+  const state: RunState = {
+    v: 1,
+    target,
+    mode: opts.mode,
+    focus,
+    allowPrivate,
+    maxPages: opts.maxPages ?? config.budgets.maxPages,
+    maxRunMs: opts.maxRunMs ?? config.budgets.maxRunMs,
+    phase: "discover",
+    pending: [{ kind: "discover", url: target, from: null, via: "start" }],
+    pages: [],
+    referrers: [],
+    candidates: [],
+    reproduced: [],
+    blocked: [],
+    notes: [],
+    events: [],
+    activities: activitiesFor(opts.mode, focus),
+    exploringStopped: false,
+    createdAt: new Date().toISOString(),
+    elapsedMs: 0,
+    slices: 0,
+    report: null,
+  };
+  if (opts.mode === "passive") {
+    state.notes.push(
+      "Passive scan: Owly looked but did not press buttons or submit forms, because ownership of this site has not been verified.",
+    );
+  }
+  emit(state, "info", `Test queued for ${new URL(target).origin} (${opts.mode === "full" ? "full test" : "passive scan"}, focus: ${focus})`);
+  return state;
+}
+
+function emit(state: RunState, level: RunEvent["level"], text: string): void {
+  state.events.push({ at: new Date().toISOString(), level, text });
+  // A progress feed, not an audit log: the oldest lines go first.
+  if (state.events.length > 400) state.events.splice(0, state.events.length - 400);
+}
+
+export interface AdvanceOptions {
+  /** Epoch ms after which no new work item starts. */
+  deadline: number;
+  /** Overrides ITEM_LIMIT_MS, for tests. */
+  itemLimitMs?: number;
+  onEvent?: (e: RunEvent) => void;
+}
+
+/**
+ * Do as much of the run as fits before `deadline`, then return. Mutates and
+ * returns `state`; the caller persists it.
+ */
+export async function advance(state: RunState, opts: AdvanceOptions): Promise<RunState> {
+  if (state.phase === "done") return state;
+  const config = load();
+  const target = new URL(state.target);
+  const sliceStart = Date.now();
+  const eventsBefore = state.events.length;
+  state.slices += 1;
+
+  const itemLimit = opts.itemLimitMs ?? ITEM_LIMIT_MS;
+  let browser: Browser | null = null;
+  let closing = false;
+  const sessions = new Map<Persona["key"], Session>();
+  const getBrowser = async () => {
+    // An attempt abandoned after a timeout may still be running; it must not
+    // launch a fresh browser after this slice has shut down.
+    if (closing) throw new Error("slice is closing");
+    return (browser ??= await launchBrowser(target, state.allowPrivate));
+  };
+  const sessionOpts = (persona: Persona) => ({ target, persona, allowPrivate: state.allowPrivate, userAgentSuffix: config.userAgentSuffix });
+  const shared = async (key: Persona["key"]) => {
+    let s = sessions.get(key);
+    if (!s) {
+      s = await Session.open(await getBrowser(), sessionOpts(PERSONAS[key]));
+      sessions.set(key, s);
+    }
+    return s;
+  };
+
+  const pages = new Map(state.pages);
+  const referrers = new Map(state.referrers);
+  const allowed = new Set(state.activities);
+
+  const take = (r: UnitResult) => {
+    for (const c of r.candidates) {
+      state.candidates.push(c);
+      emit(state, "suspect", `Possible issue: ${c.title}`);
+    }
+    state.notes.push(...r.notes);
+    for (const d of r.discovered) state.pending.push({ kind: "discover", url: d.url, from: d.from, via: d.via });
+  };
+
+  const overBudget = () => state.elapsedMs + (Date.now() - sliceStart) > state.maxRunMs;
+
+  const attempt = async <T>(fn: () => Promise<T>): Promise<Outcome<T>> => {
+    const started = Date.now();
+    try {
+      const result = await within(fn(), itemLimit);
+      if (result === "timeout") {
+        if (process.env.VERCEL) console.log(`[owly] item timed out after ${itemLimit}ms`);
+        return { ok: false, reason: "timeout", error: `took longer than ${Math.round(itemLimit / 1000)}s`, stopSlice: true };
+      }
+      if (process.env.VERCEL) console.log(`[owly] item done in ${Date.now() - started}ms`);
+      return { ok: true, value: result };
+    } catch (err) {
+      // If the browser itself died, nothing else in this slice can run; end it
+      // and let the next slice start a new one.
+      const dead = browser !== null && !(browser as Browser).isConnected();
+      return { ok: false, reason: "error", error: String(err).split("\n")[0]!.slice(0, 200), stopSlice: dead };
+    }
+  };
+
+  /** Requeue a failed item once; after that, skip it and say so. True if skipped. */
+  const retryOrSkip = (item: WorkItem, label: string, o: { reason: string; error: string }) => {
+    const tries = (item.tries ?? 0) + 1;
+    console.log(`[owly] ${label} failed (${o.reason}, attempt ${tries}): ${o.error}`);
+    if (tries < 2) {
+      state.pending.unshift({ ...item, tries });
+      return false;
+    }
+    state.notes.push(`Skipped ${label}: ${o.reason === "timeout" ? o.error : `it failed twice (${o.error})`}.`);
+    emit(state, "warn", `Skipped ${label}`);
+    return true;
+  };
+
+  try {
+    while (Date.now() < opts.deadline) {
+      const item = state.pending.shift();
+
+      if (!item) {
+        // --- phase transitions -------------------------------------------
+        if (state.phase === "discover") {
+          addBrokenLinks(state, pages, referrers);
+          const ok = [...pages].filter(([, s]) => s !== null && s < 400).map(([u]) => u);
+          if (allowed.has("layout")) {
+            emit(state, "info", `Trying ${ok.length} page${ok.length === 1 ? "" : "s"} as an impatient phone user`);
+            for (const url of ok) state.pending.push({ kind: "unit", persona: "mobile_impatient", activity: "layout", url });
+          }
+          if (allowed.has("keyboard")) {
+            emit(state, "info", `Trying ${ok.length} page${ok.length === 1 ? "" : "s"} with only a keyboard`);
+            for (const url of ok) state.pending.push({ kind: "unit", persona: "keyboard_only", activity: "keyboard", url });
+          }
+          state.phase = "personas";
+          continue;
+        }
+        if (state.phase === "personas") {
+          const units = [...new Set(state.candidates.map((c) => c.unit))];
+          if (units.length) {
+            emit(state, "info", `Reproducing ${state.candidates.length} possible issue${state.candidates.length === 1 ? "" : "s"} in a fresh browser`);
+          }
+          for (const unit of units) state.pending.push({ kind: "replay", unit });
+          state.phase = "verify";
+          continue;
+        }
+        if (state.phase === "verify") {
+          finish(state, pages, sliceStart);
+          break;
+        }
+        break;
+      }
+
+      // --- work items -----------------------------------------------------
+      // Everything a unit does runs inside `attempt`, which gives up after
+      // ITEM_LIMIT_MS. Units only RETURN what they found; state is changed
+      // here, after the attempt, and never by an attempt that was abandoned.
+      // A hung page cannot take the slice past the function's time limit, and
+      // a late finisher cannot write into a run that has already been saved.
+
+      if (item.kind === "discover") {
+        let url: string;
+        try {
+          url = normalise(item.url);
+        } catch {
+          continue;
+        }
+        if (!sameOrigin(url, target)) continue;
+        if (item.from && !item.tries) referrers.set(url, [...(referrers.get(url) ?? []), { from: item.from, via: item.via }]);
+        if (pages.has(url) || state.exploringStopped) continue;
+
+        const okCount = [...pages.values()].filter((s) => s !== null && s < 400).length;
+        if (okCount >= state.maxPages || overBudget()) {
+          state.exploringStopped = true;
+          state.notes.push(
+            okCount >= state.maxPages
+              ? `Explored the first ${state.maxPages} pages and stopped there.`
+              : "Stopped exploring new pages to stay within the time budget.",
+          );
+          continue;
+        }
+
+        emit(state, "info", `Opening ${new URL(url).pathname}`);
+        const outcome = await attempt(async () => loadUnit(await shared("new_user"), url));
+        if (!outcome.ok) {
+          if (retryOrSkip(item, `open ${new URL(url).pathname}`, outcome)) pages.set(url, null);
+          if (outcome.stopSlice) break;
+          continue;
+        }
+        const loaded = outcome.value;
+        pages.set(url, loaded.status);
+        if (loaded.status !== null && loaded.status >= 400) {
+          emit(state, "warn", `${new URL(url).pathname} answered HTTP ${loaded.status}`);
+          continue;
+        }
+        take(loaded);
+        // Finish this page before moving to the next one.
+        const units: WorkItem[] = [];
+        for (const activity of ["a11y", "layout", "buttons", "forms"] as const) {
+          if (allowed.has(activity) && !(activity === "layout" && state.focus === "mobile")) {
+            units.push({ kind: "unit", persona: "new_user", activity, url });
+          }
+        }
+        state.pending.unshift(...units);
+        continue;
+      }
+
+      if (item.kind === "unit") {
+        if (overBudget() && state.phase !== "verify") {
+          state.notes.push("Some checks were skipped to stay within the time budget.");
+          continue;
+        }
+        const path = new URL(item.url).pathname;
+        if (item.activity === "buttons" && !item.tries) emit(state, "info", `Pressing buttons on ${path}`);
+        if (item.activity === "forms" && !item.tries) emit(state, "info", `Filling in forms on ${path}`);
+        const outcome = await attempt(async () => runUnit(await shared(item.persona), item.activity, item.url, state.mode));
+        if (!outcome.ok) {
+          retryOrSkip(item, `${ACTIVITY_LABEL[item.activity]} on ${path}`, outcome);
+          if (outcome.stopSlice) break;
+          continue;
+        }
+        take(outcome.value);
+        continue;
+      }
+
+      // replay, in a fresh context that no earlier work has touched
+      const { persona, activity, url } = parseUnit(item.unit);
+      const outcome = await attempt(async () => {
+        const fresh = await Session.open(await getBrowser(), sessionOpts(PERSONAS[persona]));
+        try {
+          if (activity === "links") {
+            const status = await fresh.goto(url);
+            return {
+              keys: status !== null && status >= 400 ? [replayKey({ unit: item.unit, fingerprint: `broken_link|${new URL(url).pathname}` })] : [],
+              blocked: fresh.blocked,
+            };
+          }
+          const replay = await runUnit(fresh, activity, url, state.mode);
+          return { keys: replay.candidates.map((c) => replayKey({ unit: item.unit, fingerprint: c.fingerprint })), blocked: fresh.blocked };
+        } finally {
+          await fresh.close();
+        }
+      });
+      if (!outcome.ok) {
+        // A replay that could not run did not reproduce anything, so whatever
+        // it was checking stays unverified - the honest outcome.
+        retryOrSkip(item, `reproducing ${ACTIVITY_LABEL[activity]} on ${new URL(url).pathname}`, outcome);
+        if (outcome.stopSlice) break;
+        continue;
+      }
+      state.reproduced.push(...outcome.value.keys);
+      state.blocked.push(...outcome.value.blocked);
+    }
+  } finally {
+    closing = true;
+    // Closing can hang on the very page that timed out, so closing is time
+    // limited too. Whatever is left dies with the function instance.
+    for (const s of sessions.values()) {
+      state.blocked.push(...s.blocked);
+      await within(s.close(), 5_000);
+    }
+    if (browser) await within((browser as Browser).close().catch(() => undefined), 5_000);
+    state.pages = [...pages];
+    state.referrers = [...referrers];
+    // `finish` may have moved the phase to done inside the loop; the compiler
+    // cannot see that through the call, so the phase is read afresh here.
+    if ((state.phase as RunState["phase"]) !== "done") state.elapsedMs += Date.now() - sliceStart;
+    for (const e of state.events.slice(eventsBefore)) opts.onEvent?.(e);
+  }
+  return state;
+}
+
+async function runUnit(s: Session, activity: Activity, url: string, mode: Mode): Promise<UnitResult> {
+  switch (activity) {
+    case "load":
+      return loadUnit(s, url);
+    case "a11y":
+      return a11yUnit(s, url);
+    case "layout":
+      return layoutUnit(s, url);
+    case "buttons":
+      return buttonsUnit(s, url);
+    case "forms":
+      return formsUnit(s, url);
+    case "keyboard":
+      return keyboardUnit(s, url, { pressButtons: mode === "full" });
+    default:
+      return { candidates: [], discovered: [], notes: [] };
+  }
+}
+
+function addBrokenLinks(
+  state: RunState,
+  pages: Map<string, number | null>,
+  referrers: Map<string, Array<{ from: string; via: string }>>,
+): void {
+  for (const [url, status] of pages) {
+    if (status === null || status < 400) continue;
+    const path = new URL(url).pathname;
+    for (const ref of referrers.get(url) ?? []) {
+      const c: Candidate = {
+        kind: "broken_link",
+        title: `Broken link: "${ref.via}" leads to a ${status} page`,
+        severity: "low",
+        url: ref.from,
+        target: `${ref.via} -> ${path}`,
+        persona: "new_user",
+        summary: `The link "${ref.via}" points to ${path}, which answers HTTP ${status}.`,
+        expected: "Links lead to a working page.",
+        actual: `HTTP ${status}.`,
+        steps: [`Open ${ref.from}`, `Follow "${ref.via}"`],
+        evidence: [{ type: "network", method: "GET", url, status }],
+        observed: [`GET ${url} -> ${status}`, `linked from ${ref.from} as "${ref.via}"`],
+        inference: [],
+        deterministic: true,
+        fingerprint: `broken_link|${path}`,
+        unit: unitKey("new_user", "links", url),
+      };
+      state.candidates.push(c);
+      emit(state, "suspect", `Possible issue: ${c.title}`);
+    }
+  }
+}
+
+function finish(state: RunState, pages: Map<string, number | null>, sliceStart: number): void {
+  const { findings, unverified } = cluster(state.candidates, new Set(state.reproduced));
+  for (const f of findings) emit(state, "confirmed", `${f.confidence === "confirmed" ? "Confirmed" : "Likely"}: ${f.title}`);
+  for (const f of unverified) emit(state, "dismissed", `Could not reproduce, so not reported: ${f.title}`);
+  for (const b of state.blocked) state.notes.push(`Refused to go to ${b.url}: ${b.reason}.`);
+
+  const okCount = [...pages.values()].filter((s) => s !== null && s < 400).length;
+  state.elapsedMs += Date.now() - sliceStart;
+  emit(state, "info", `Done: ${findings.length} issue${findings.length === 1 ? "" : "s"} found on ${okCount} page${okCount === 1 ? "" : "s"}`);
+
+  const redact = createRedactor();
+  state.report = redact.value<RunReport>({
+    target: state.target,
+    mode: state.mode,
+    focus: state.focus,
+    activities: state.activities,
+    startedAt: state.createdAt,
+    finishedAt: new Date().toISOString(),
+    durationMs: state.elapsedMs,
+    slices: state.slices,
+    findings,
+    unverified,
+    pages: [...pages].map(([url, status]) => ({ url, status })),
+    notes: [...new Set(state.notes)],
+    events: state.events,
+  });
+  state.phase = "done";
+  // The report carries everything a reader needs; the working set does not
+  // need to be stored twice.
+  state.candidates = [];
+  state.pending = [];
+}

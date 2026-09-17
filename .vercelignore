@@ -1,0 +1,8 @@
+# Only the service ships. The lab, tests and tools are for proving it works,
+# and have no business being reachable from the deployment.
+lab
+tests
+tools
+.github
+*.md
+.env*

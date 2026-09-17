@@ -9,3 +9,4 @@ lab/.runs/
 test-results/
 
 .vercel
+.env*

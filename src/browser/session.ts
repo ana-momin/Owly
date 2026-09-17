@@ -111,11 +111,17 @@ export async function launchBrowser(target: URL, allowPrivate: boolean): Promise
   if (serverless) {
     const { default: chromium } = await import("@sparticuz/chromium");
     const { chromium: playwright } = await import("playwright-core");
-    return playwright.launch({
+    const browser = await playwright.launch({
       executablePath: await chromium.executablePath(),
       args: [...chromium.args, ...extraArgs],
       headless: true,
     });
+    // Serverless Chromium runs as a single process, and closing its last
+    // context can take the whole browser down with it - the next session then
+    // fails with "browser has been closed". This context is never used and
+    // never closed, so every session Owly opens and closes has company.
+    await browser.newContext();
+    return browser;
   }
   const { chromium: playwright } = await import("playwright");
   return playwright.launch({ headless: true, args: extraArgs });
@@ -141,11 +147,13 @@ export class Session {
   ) {}
 
   static async open(browser: Browser, opts: SessionOptions): Promise<Session> {
-    const ua = (await browser.newPage().then(async (p) => {
-      const v = await p.evaluate("navigator.userAgent");
-      await p.close();
-      return String(v);
-    })).replace("HeadlessChrome", "Chrome");
+    // Built from the version rather than read from a scratch page: opening
+    // and closing a page just to read navigator.userAgent was what killed the
+    // single-process serverless browser.
+    const platform = opts.persona.isMobile
+      ? "Linux; Android 14; Pixel 8"
+      : "X11; Linux x86_64";
+    const ua = `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${browser.version()}${opts.persona.isMobile ? " Mobile" : ""} Safari/537.36`;
 
     const context = await browser.newContext({
       viewport: opts.persona.viewport,
@@ -204,6 +212,15 @@ export class Session {
         at: Date.now(),
         location: loc.url ? `${loc.url}:${loc.lineNumber}:${loc.columnNumber}` : "",
       });
+    });
+
+    // alert(), confirm() and prompt() stop the page until someone answers, and
+    // a page that is stopped also stops every evaluation Owly runs in it. They
+    // are dismissed, which for confirm() means "Cancel" - the safe answer when
+    // the question might be "Delete this?".
+    page.on("dialog", (dialog) => {
+      this.console.push({ level: "dialog", text: `${dialog.type()}: ${dialog.message()}`, at: Date.now(), location: "" });
+      dialog.dismiss().catch(() => undefined);
     });
 
     page.on("pageerror", (err) => {

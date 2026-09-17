@@ -746,7 +746,11 @@ interface FocusRead {
 }
 
 /** Walk the page with Tab, then open each dialog and try to get out of it. */
-export async function keyboardUnit(s: Session, url: string): Promise<UnitResult> {
+export async function keyboardUnit(
+  s: Session,
+  url: string,
+  opts: { pressButtons: boolean } = { pressButtons: true },
+): Promise<UnitResult> {
   const unit = unitKey(s.opts.persona.key, "keyboard", url);
   const result: UnitResult = { candidates: [], discovered: [], notes: [] };
   const status = await s.goto(url, READ_PATIENCE_MS);
@@ -791,6 +795,9 @@ export async function keyboardUnit(s: Session, url: string): Promise<UnitResult>
   }
 
   // --- can you leave a dialog? --------------------------------------------
+  // Opening a dialog means pressing a button, which a passive scan must not do
+  // on a site whose owner has not verified it.
+  if (!opts.pressButtons) return result;
   const buttons = (await s.eval<Array<{ key: string; name: string }>>(js.LIST_LOOSE_BUTTONS)).slice(0, 5);
   for (const b of buttons) {
     if (assess({ name: b.name, role: "button" }).risk === "destructive") continue;
