@@ -10,3 +10,8 @@ test-results/
 
 .vercel
 .env*
+
+# Installed by the Neon integration for coding agents; not part of Owly.
+.agents/
+.claude/
+skills-lock.json
