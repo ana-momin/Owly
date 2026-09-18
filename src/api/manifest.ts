@@ -100,6 +100,7 @@ export function manifest(): Record<string, unknown> {
     agent_version: AGENT_VERSION,
     metadata: {
       name: "Owly",
+      logo_url: "https://tryowly.vercel.app/logo.png",
       short_description: "Tests your website like a new user would, in a real browser, and shows proof of every problem it finds.",
       description:
         "<p>Owly opens your site in a real browser and uses it the way people do: as a new desktop user, as an impatient phone user, and with only a keyboard. " +

@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Owly: see what breaks before your users do</title>
 <meta name="description" content="Owly opens your site in a real browser as a new user, a phone user and a keyboard-only user, and reports only the problems it can reproduce, with steps and proof.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2316181d'/%3E%3Ccircle cx='11.5' cy='15' r='4' fill='%23fff'/%3E%3Ccircle cx='20.5' cy='15' r='4' fill='%23fff'/%3E%3Ccircle cx='11.5' cy='15' r='1.6' fill='%2316181d'/%3E%3Ccircle cx='20.5' cy='15' r='1.6' fill='%2316181d'/%3E%3Cpath d='M14 21l2 2 2-2' stroke='%23f5b73b' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="/icon-32.png" sizes="32x32">
+<link rel="icon" href="/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#2b2b3f">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://tryowly.vercel.app/">
+<meta property="og:title" content="Owly: can a new visitor actually sign up?">
+<meta property="og:description" content="Owly opens your site in a real browser and tries your main task: follows the call to action, fills the form in, presses the button. One straight answer, with the screen where it stopped.">
+<meta property="og:image" content="https://tryowly.vercel.app/logo.png">
+<meta name="twitter:card" content="summary">
 <style>
 :root{--paper:#f7f6f2;--card:#fff;--ink:#16181d;--ink2:#4a4f5a;--dim:#5b6270;--line:#e7e5df;--accent:#3b3bd6;--amber:#f5b73b;--ok:#15803d;--bad:#b42318}
 *{box-sizing:border-box}
@@ -15,7 +24,7 @@ a{color:inherit}
 .w{max-width:1040px;margin:0 auto;padding:0 22px}
 nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
 .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.02em;text-decoration:none}
-.logo svg{width:30px;height:30px}
+.logo img{width:30px;height:30px;border-radius:8px;display:block}
 nav .links{display:flex;gap:22px;font-size:14.5px}
 nav .links a{text-decoration:none;color:var(--ink2)}
 nav .links a:hover{color:var(--ink)}
@@ -95,7 +104,7 @@ footer{padding:40px 0 60px;border-top:1px solid var(--line);color:var(--dim);fon
 <div class="w">
   <nav>
     <a class="logo" href="/">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#16181d"/><circle cx="11.5" cy="15" r="4" fill="#fff"/><circle cx="20.5" cy="15" r="4" fill="#fff"/><circle cx="11.5" cy="15" r="1.6" fill="#16181d"/><circle cx="20.5" cy="15" r="1.6" fill="#16181d"/><path d="M14 21l2 2 2-2" stroke="#f5b73b" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <img src="/icon-64.png" alt="" width="30" height="30" decoding="async">
       Owly
     </a>
     <div class="links"><a href="#checks">What it checks</a><a href="#how">How it works</a><a href="#verify">Verification</a></div>

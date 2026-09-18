@@ -1,3 +1,5 @@
+<img src="public/logo.png" alt="" width="88" align="left" hspace="14">
+
 # Owly
 
 Owly opens your website in a real browser and tries to do what it is for:
