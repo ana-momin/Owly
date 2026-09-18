@@ -115,5 +115,8 @@ describe("the blocked journey becomes the report's headline", () => {
     expect(first.evidence.some((e) => e.type === "screenshot")).toBe(true);
     // Verified like anything else: reported only because it happened twice.
     expect(first.reproductions.reproduced).toBeGreaterThanOrEqual(2);
+    // And stated as certainly as the evidence allows: the step that stopped
+    // the journey failed with a status the browser recorded.
+    expect(first.confidence).toBe("confirmed");
   }, 300_000);
 });

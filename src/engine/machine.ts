@@ -539,6 +539,13 @@ function applyJourney(state: RunState, journey: Journey): void {
     .slice(-2)
     .map((s): Evidence => ({ type: "screenshot", ref: s.shot!, caption: `Step ${s.n}: ${s.action} - ${s.outcome}` }));
 
+  // Choosing the journey is a heuristic, so the finding is "likely" by
+  // default. But when the step that stopped it failed with a status the
+  // browser recorded, the stop itself is a fact, not a guess - and it would
+  // read oddly for the headline to be less certain than the form finding
+  // that corroborates it.
+  const hardEvidence = (where?.evidence ?? []).some((e) => e.type === "network" && typeof e.status === "number" && e.status >= 400);
+
   state.candidates.push({
     kind: "task_blocked",
     title: `A new visitor cannot ${journey.goal.toLowerCase()}`,
@@ -555,7 +562,7 @@ function applyJourney(state: RunState, journey: Journey): void {
     inference: [
       "Owly picked this task from the most prominent call to action on the home page; it does not know the product, so the task it chose may not be the one that matters most to you.",
     ],
-    deterministic: false,
+    deterministic: hardEvidence,
     fingerprint: `task_blocked|${journey.task}`,
     unit: unitKey("new_user", "journey", state.target),
   });
