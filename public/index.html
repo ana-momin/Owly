@@ -3,196 +3,201 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Owly: find the broken step before your users do</title>
-<meta name="description" content="Owly opens your site in a real browser, tries to sign up, buy or book like a new visitor, and shows you the exact step where it stopped - with the screen, the failing request and steps to reproduce.">
+<title>Owly: while you sleep, it tries to sign up</title>
+<meta name="description" content="Owly opens your site in a real browser, tries the one thing that matters - sign up, buy, book - and hands you one sentence, the step it died on, and a picture of the screen.">
 <link rel="icon" href="/icon-32.png" sizes="32x32">
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="/icon-180.png">
-<meta name="theme-color" content="#232338">
+<meta name="theme-color" content="#0d0c1a">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://tryowly.vercel.app/">
-<meta property="og:title" content="Owly: find the broken step before your users do">
-<meta property="og:description" content="A real browser tries your signup every day and shows you the screen where it stopped.">
+<meta property="og:title" content="Owly: while you sleep, it tries to sign up">
+<meta property="og:description" content="A real browser. Your real signup. One straight answer, with the screen where it stopped.">
 <meta property="og:image" content="https://tryowly.vercel.app/logo.png">
 <meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
 
 <header class="site">
   <div class="w">
-    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="30" height="30" decoding="async"> Owly</a>
+    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
     <nav class="main">
-      <a href="/how-it-works">How it works</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/demo-report">Example report</a>
+      <a href="/how-it-works">how it works</a>
+      <a href="/pricing">pricing</a>
+      <a href="/demo-report">a real report</a>
     </nav>
-    <a class="btn primary" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
+    <a class="btn lav" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
   </div>
 </header>
-  <div class="mobile-nav">
-    <a href="/how-it-works">How it works</a>
-    <a href="/pricing">Pricing</a>
-    <a href="/demo-report">Example report</a>
-    <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
-  </div>
+<div class="mobile-nav">
+  <a href="/how-it-works">how it works</a>
+  <a href="/pricing">pricing</a>
+  <a href="/demo-report">a real report</a>
+  <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
+</div>
 
 <main>
 
 <div class="hero">
+  <span class="glow a"></span><span class="glow b"></span>
   <div class="w hero-grid">
     <div>
-      <span class="eyebrow">Autonomous QA agent</span>
-      <h1 class="display">Nobody tells you the signup is broken.</h1>
-      <p class="lede">They just leave. Owly opens your site in a real browser, tries the one thing that matters &mdash; sign up, buy, book &mdash; and shows you the exact screen where it stopped.</p>
+      <span class="kicker">Owly &middot; autonomous QA</span>
+      <h1 class="big">While you sleep, Owly <em class="it">tries to sign&nbsp;up</em>.</h1>
+      <p class="lede">A real browser. Your real signup. In the morning you get one sentence, the step it died on, and a picture of the screen at that moment.</p>
       <div class="cta-row">
-        <a class="btn primary lg" href="https://joinpond.ai" rel="noopener">Start on Pond
+        <a class="btn lav lg" href="https://joinpond.ai" rel="noopener">Start on Pond
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
-        <a class="btn ghost lg" href="/demo-report">See a real report</a>
+        <a class="btn outline lg" href="/demo-report">Read a real report</a>
       </div>
-      <div class="trust">
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Five tests a month, free</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Nothing to install</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Reproduced before reported</span>
-      </div>
+      <p class="under">free &middot; five tests a month &middot; nothing to install</p>
     </div>
 
-    <div class="mock" role="img" aria-label="An Owly report: a new visitor could not create an account, stopped at step 4 of 4">
-      <div class="bar"><span class="dot"></span><b>Owly report</b> &middot; full test &middot; 4 pages</div>
-      <div class="body">
-        <div class="verdict-card">
-          <span class="tag">Verdict</span>
-          <h4>A new visitor could not create an account.</h4>
-          <p>Stopped at step 4 of 4: pressing &ldquo;Create account&rdquo;.</p>
-          <code>POST /api/signup &rarr; 500
-"Something went wrong. Please try again."</code>
-        </div>
-        <div class="row-item"><span class="sev high">High</span><span><b>Submitting &ldquo;Create account&rdquo; fails</b><small>Confirmed: seen 2 of 2 attempts</small></span></div>
-        <div class="row-item"><span class="sev med">Medium</span><span><b>Nothing happens after &ldquo;Sign in&rdquo;</b><small>No request, no new page, no message</small></span></div>
+    <div class="console" role="img" aria-label="A test run: Owly opens the site, presses Create a free account, fills three fields, presses Create account, and the server returns 500. Verdict: a new visitor could not create an account.">
+      <div class="top"><i></i><i></i><i></i><span>owly &middot; test run</span></div>
+      <div class="lines">
+        <p class="ln"><b>01</b><span>open https://your-site.com</span></p>
+        <p class="ln"><b>02</b><span>press &ldquo;Create a free account&rdquo;</span></p>
+        <p class="ln"><b>03</b><span>fill 3 fields &mdash; owly.qa+8mpk@example.com</span></p>
+        <p class="ln no"><b>04</b><span>press &ldquo;Create account&rdquo; &rarr; POST /api/signup 500</span></p>
+        <p class="ln"><b>05</b><span>replay in a fresh browser &rarr; same</span></p>
       </div>
-      <div class="foot">Every issue replayed in a fresh browser before it was reported.</div>
+      <div class="out">
+        <span class="tag">Verdict</span>
+        <h3>A new visitor could not create an account.</h3>
+        <p>stopped at step 4 of 4 &middot; screenshot and failing request attached</p>
+      </div>
     </div>
   </div>
 </div>
 
+<div class="ticker" aria-hidden="true">
+  <div class="track">
+    <span>the main journey</span><span>forms that fail</span><span>silent submits</span><span>console errors</span>
+    <span>broken links</span><span>390px overflow</span><span>covered buttons</span><span>focus traps</span>
+    <span>WCAG 2.1 AA</span><span>slow requests</span><span>flaky saves</span>
+    <span>the main journey</span><span>forms that fail</span><span>silent submits</span><span>console errors</span>
+    <span>broken links</span><span>390px overflow</span><span>covered buttons</span><span>focus traps</span>
+    <span>WCAG 2.1 AA</span><span>slow requests</span><span>flaky saves</span>
+  </div>
+</div>
+
+<section class="day">
+  <div class="w">
+    <div class="rise">
+      <span class="kicker">The evidence</span>
+      <h2 class="big">It does not tell you. It <em class="it">shows</em> you.</h2>
+      <p class="lede">Four screenshots from one real run, in order, ending where it stopped. Nothing here is staged.</p>
+    </div>
+
+    <div class="strip rise">
+      <figure class="frame">
+        <img src="/assets/step-1.jpg" alt="The home page of the tested site" loading="lazy" width="400" height="300">
+        <figcaption><b>Step 1</b><p>Opened the home page</p></figcaption>
+      </figure>
+      <figure class="frame">
+        <img src="/assets/step-2.jpg" alt="The signup page, reached by the main call to action" loading="lazy" width="400" height="300">
+        <figcaption><b>Step 2</b><p>Pressed &ldquo;Create a free account&rdquo;</p></figcaption>
+      </figure>
+      <figure class="frame">
+        <img src="/assets/step-3.jpg" alt="The signup form filled in with test details" loading="lazy" width="400" height="300">
+        <figcaption><b>Step 3</b><p>Filled in three fields</p></figcaption>
+      </figure>
+      <figure class="frame stop">
+        <span class="pin">stopped</span>
+        <img src="/assets/step-4.jpg" alt="The signup form showing a server error after submitting" loading="lazy" width="400" height="300">
+        <figcaption><b>Step 4</b><p>The server failed: 500</p></figcaption>
+      </figure>
+    </div>
+
+    <div class="strip-foot rise">
+      <p>owly-demo-rho.vercel.app &middot; full test &middot; 1m 30s &middot; 3 issues</p>
+      <a class="btn onCream" href="/demo-report">Open the whole report</a>
+    </div>
+  </div>
+</section>
+
 <section>
+  <span class="glow c"></span>
   <div class="w">
-    <span class="eyebrow">Evidence, not opinions</span>
-    <h2 class="section">Every claim comes with the screen it came from.</h2>
-    <p class="lede">This is a real test of a real site, run end to end. Nothing is staged.</p>
-
-    <div class="proof">
-      <div class="head">
-        <b>owly-demo-rho.vercel.app</b>
-        <a class="btn ghost" href="/demo-report">Open the full report</a>
-      </div>
-      <div class="shots">
-        <figure>
-          <img src="/assets/step-1.jpg" alt="The home page of the tested site" loading="lazy" width="400" height="275">
-          <figcaption><b>Step 1</b><span>Opened the home page</span></figcaption>
-        </figure>
-        <figure>
-          <img src="/assets/step-2.jpg" alt="The signup page after following the main call to action" loading="lazy" width="400" height="275">
-          <figcaption><b>Step 2</b><span>Pressed &ldquo;Create a free account&rdquo;</span></figcaption>
-        </figure>
-        <figure>
-          <img src="/assets/step-3.jpg" alt="The signup form filled in with test details" loading="lazy" width="400" height="275">
-          <figcaption><b>Step 3</b><span>Filled in three fields</span></figcaption>
-        </figure>
-        <figure class="bad">
-          <img src="/assets/step-4.jpg" alt="The signup form showing an error after submitting" loading="lazy" width="400" height="275">
-          <figcaption><b>Step 4</b><span>The server failed: 500</span></figcaption>
-        </figure>
-      </div>
+    <div class="rise">
+      <span class="kicker">What it catches</span>
+      <h2 class="big">The first five minutes, <em class="it">from the outside</em>.</h2>
     </div>
-  </div>
-</section>
-
-<section style="padding-top:0">
-  <div class="w">
-    <span class="eyebrow">How it works</span>
-    <h2 class="section">Three steps. No setup.</h2>
-    <div class="grid g3">
-      <div class="card">
-        <div class="rowtop"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></div><span class="n">01</span></div>
-        <h3>Give it a link</h3>
-        <p>Ask Owly on Pond to test your site. No script, no SDK, no account on our side.</p>
-      </div>
-      <div class="card">
-        <div class="rowtop"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><span class="n">02</span></div>
-        <h3>It uses your site</h3>
-        <p>As a new visitor, an impatient phone user and someone with only a keyboard &mdash; in a real browser.</p>
-      </div>
-      <div class="card">
-        <div class="rowtop"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></div><span class="n">03</span></div>
-        <h3>You get the answer</h3>
-        <p>One sentence, the failing step, the screen, the failing request &mdash; and an issue you can paste into GitHub.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section style="padding-top:0">
-  <div class="w">
-    <span class="eyebrow">What it catches</span>
-    <h2 class="section">The things people hit in the first five minutes.</h2>
-    <div class="grid g3">
-      <div class="card">
+    <div class="bento rise">
+      <div class="tile wide">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
         <h3>The main journey</h3>
-        <p>Whether a newcomer can finish sign up, checkout or booking &mdash; and which step stopped them.</p>
+        <p>Whether a newcomer can finish sign up, checkout or booking &mdash; and the exact step that stopped them.</p>
+        <div class="sample">step 3 &nbsp;fill in the create an account form &rarr; ok<br>step 4 &nbsp;press &ldquo;Create account&rdquo; &rarr; <b>the server failed: 500</b></div>
       </div>
-      <div class="card">
+      <div class="tile">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg></div>
-        <h3>Forms that fail</h3>
-        <p>Submissions that error on the server, submissions that do nothing at all, fields that accept a nonsense email.</p>
+        <h3>Forms</h3>
+        <p>Submissions that error, submissions that do nothing at all, fields that accept a nonsense email.</p>
       </div>
-      <div class="card">
+      <div class="tile">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
-        <h3>Errors in the console</h3>
-        <p>Uncaught exceptions with the line that threw, failed requests and slow ones.</p>
+        <h3>Errors</h3>
+        <p>Uncaught exceptions with the line that threw them, failed requests, and the slow ones.</p>
       </div>
-      <div class="card">
+      <div class="tile">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M12 18h.01"/></svg></div>
-        <h3>Broken on phones</h3>
-        <p>Sideways scrolling, text cut off, buttons covered by something else at 390px.</p>
+        <h3>Phones</h3>
+        <p>Sideways scroll, clipped text, buttons hidden under something else at 390px.</p>
       </div>
-      <div class="card">
+      <div class="tile">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v.01M9 11h6M12 11v5"/></svg></div>
-        <h3>Keyboard and access</h3>
+        <h3>Keyboard &amp; access</h3>
         <p>Focus you cannot see, dialogs you cannot leave, and a WCAG 2.1 A/AA scan.</p>
       </div>
-      <div class="card">
+      <div class="tile">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></div>
+        <h3>Links &amp; images</h3>
+        <p>Links that lead to an error page, images that never load, on every page it reaches.</p>
+      </div>
+      <div class="tile wide">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg></div>
-        <h3>The third time</h3>
-        <p>A save that works twice and fails on the third go. Owly repeats things people repeat.</p>
+        <h3>The third try</h3>
+        <p>A save that works twice and fails on the third go. Owly repeats what people repeat, and reports the pattern rather than the one bad attempt.</p>
+        <div class="sample">save 1 &rarr; ok &nbsp;&middot;&nbsp; save 2 &rarr; ok &nbsp;&middot;&nbsp; save 3 &rarr; <b>500</b> &nbsp;&middot;&nbsp; save 4 &rarr; ok</div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="band">
+<section class="day">
   <div class="w">
-    <span class="eyebrow">Safety</span>
-    <h2 class="section">It touches nothing you would not want touched.</h2>
-    <p class="lede">A tester loose in your product is only useful if you can predict what it will do.</p>
-    <div class="safety">
-      <div>
-        <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Never presses the dangerous thing</b>
-        <p>Pay, delete, send, invite, publish, unsubscribe &mdash; it stops and says so instead.</p>
+    <div class="rise">
+      <span class="kicker">How it works</span>
+      <h2 class="big">Three steps. <em class="it">No setup.</em></h2>
+    </div>
+    <div class="steps rise">
+      <div class="stepline">
+        <div class="num">01</div>
+        <div>
+          <h3>Give it a link</h3>
+          <p>Ask Owly on Pond to test your site. No script on your pages, no SDK, no account to create on our side.</p>
+        </div>
       </div>
-      <div>
-        <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg> Never leaves your origin</b>
-        <p>Not by link, not by redirect, not by anything the page tries on its own.</p>
+      <div class="stepline">
+        <div class="num">02</div>
+        <div>
+          <h3>It uses your product</h3>
+          <p>As a new visitor, as an impatient phone user, and as someone with only a keyboard &mdash; in a real browser, following your own call to action.</p>
+        </div>
       </div>
-      <div>
-        <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg> Obvious test data only</b>
-        <p>Every field gets something like <span style="white-space:nowrap">owly.qa+&hellip;@example.com</span>. Nothing real, ever.</p>
-      </div>
-      <div>
-        <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Your site, proven yours</b>
-        <p>Until you publish a token we give you, Owly only looks &mdash; it will not type or press.</p>
+      <div class="stepline">
+        <div class="num">03</div>
+        <div>
+          <h3>You get the answer</h3>
+          <p>One sentence, the failing step, the screen, the failing request, and an issue you can paste straight into GitHub.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -200,13 +205,40 @@
 
 <section>
   <div class="w">
-    <div class="final">
-      <h2>Point Owly at your site.</h2>
-      <p>Five tests a month, free. The first one takes about ninety seconds.</p>
-      <div class="cta-row">
-        <a class="btn onBrand lg" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
-        <a class="btn outlineLight lg" href="/how-it-works">How it works</a>
+    <div class="rise">
+      <span class="kicker">Safety</span>
+      <h2 class="big">A tester loose in your product is only useful if you can <em class="it">predict it</em>.</h2>
+    </div>
+    <div class="never rise">
+      <div>
+        <b>never presses</b>
+        <p>Pay, delete, send, invite, publish, unsubscribe. It stops at the button and says so in the report.</p>
       </div>
+      <div>
+        <b>never leaves</b>
+        <p>Your origin is the whole world. Not by link, not by redirect, not by anything the page attempts on its own.</p>
+      </div>
+      <div>
+        <b>never types</b>
+        <p>Anything but obvious test data. Every field gets something like owly.qa+8mpk@example.com.</p>
+      </div>
+      <div>
+        <b>never assumes</b>
+        <p>Until you publish a token proving the site is yours, Owly only looks. It will not fill anything in or press anything.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="closer">
+  <span class="glow b"></span>
+  <div class="w narrow rise">
+    <img class="owl" src="/icon-192.png" alt="" width="92" height="92" decoding="async">
+    <h2>Point it at your site tonight.</h2>
+    <p>Five tests a month, free. The first answer takes about ninety seconds.</p>
+    <div class="cta-row">
+      <a class="btn lav lg" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
+      <a class="btn outline lg" href="/how-it-works">How it works</a>
     </div>
   </div>
 </section>
@@ -216,18 +248,19 @@
 <footer class="site">
   <div class="w">
     <div class="cols">
-      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="30" height="30" decoding="async"> Owly</a>
+      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
       <div class="links">
-        <a href="/how-it-works">How it works</a>
-        <a href="/pricing">Pricing</a>
-        <a href="/demo-report">Example report</a>
-        <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
-        <a href="https://joinpond.ai" rel="noopener">Pond</a>
+        <a href="/how-it-works">how it works</a>
+        <a href="/pricing">pricing</a>
+        <a href="/demo-report">a real report</a>
+        <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
+        <a href="https://joinpond.ai" rel="noopener">pond</a>
       </div>
     </div>
     <p class="fine">Owly is rule-based checks and scripted user behaviour in a real browser. It does not guess, and nothing reaches a report unless the browser recorded it twice.</p>
   </div>
 </footer>
 
+<script src="/assets/site.js" defer></script>
 </body>
 </html>

@@ -8,85 +8,89 @@
 <link rel="icon" href="/icon-32.png" sizes="32x32">
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="/icon-180.png">
-<meta name="theme-color" content="#232338">
+<meta name="theme-color" content="#0d0c1a">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Owly pricing">
 <meta property="og:description" content="Five full tests a month, free.">
 <meta property="og:image" content="https://tryowly.vercel.app/logo.png">
 <meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
 
 <header class="site">
   <div class="w">
-    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="30" height="30" decoding="async"> Owly</a>
+    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
     <nav class="main">
-      <a href="/how-it-works">How it works</a>
-      <a href="/pricing" aria-current="page">Pricing</a>
-      <a href="/demo-report">Example report</a>
+      <a href="/how-it-works">how it works</a>
+      <a href="/pricing" aria-current="page">pricing</a>
+      <a href="/demo-report">a real report</a>
     </nav>
-    <a class="btn primary" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
+    <a class="btn lav" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
   </div>
 </header>
-  <div class="mobile-nav">
-    <a href="/how-it-works">How it works</a>
-    <a href="/pricing" aria-current="page">Pricing</a>
-    <a href="/demo-report">Example report</a>
-    <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
-  </div>
+<div class="mobile-nav">
+  <a href="/how-it-works">how it works</a>
+  <a href="/pricing" aria-current="page">pricing</a>
+  <a href="/demo-report">a real report</a>
+  <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
+</div>
 
 <main>
 
-<div class="hero compact">
-  <div class="w center">
-    <span class="eyebrow">Pricing</span>
-    <h1 class="display" style="margin-left:auto;margin-right:auto">Start free. No card.</h1>
-    <p class="lede">A finished test counts once, however many issues it finds.</p>
+<div class="hero">
+  <span class="glow a"></span><span class="glow b"></span>
+  <div class="w narrow">
+    <span class="kicker">Pricing</span>
+    <h1 class="big">Start free. <em class="it">No card.</em></h1>
+    <p class="lede">One finished test counts once, however many issues it finds. A test that could not open your site does not count at all.</p>
   </div>
 </div>
 
-<section style="padding-top:0">
+<section style="padding-top:clamp(20px,3vw,40px)">
   <div class="w">
-    <div class="plans">
-      <div class="plan feature">
-        <span class="pill">Available now</span>
-        <h3 style="font-size:20px;margin-top:16px">Free</h3>
+    <div class="plans rise">
+      <div class="plan hot">
+        <span class="pill">available now</span>
+        <h3>Free</h3>
         <div class="price">$0<span> / month</span></div>
-        <p class="sub">Five full tests a month.</p>
+        <p class="note">Five full tests a month.</p>
         <ul>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> The main journey, tried end to end</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Forms, errors, links and images</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Phone layout and keyboard checks</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> WCAG 2.1 A/AA scan</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> A WCAG 2.1 A/AA scan</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> A shareable report page with screenshots</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Issues ready to paste into GitHub</li>
         </ul>
-        <a class="btn primary lg" href="https://joinpond.ai" rel="noopener" style="width:100%">Start on Pond</a>
+        <a class="btn lav lg" href="https://joinpond.ai" rel="noopener" style="width:100%">Start on Pond</a>
       </div>
 
       <div class="plan">
-        <span class="pill" style="color:var(--soft);background:#f1f0f5">Not yet</span>
-        <h3 style="font-size:20px;margin-top:16px">More than five</h3>
-        <div class="price" style="font-size:32px;color:var(--soft)">Soon</div>
-        <p class="sub">Scheduled runs, more tests a month, re-testing after a fix.</p>
+        <span class="pill" style="color:var(--muted)">not yet</span>
+        <h3>More than five</h3>
+        <div class="price" style="font-size:44px;color:var(--muted)">Soon</div>
+        <p class="note">Scheduled runs, more tests a month, and a re-test that says fixed or still broken.</p>
         <ul>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/></svg> Being built now</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/></svg> Nothing to enter today, nothing is billed</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/></svg> Tell Owly on Pond if you want more sooner</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Being built now</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Nothing to enter today, nothing is billed</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Tell Owly on Pond if you want it sooner</li>
         </ul>
-        <a class="btn ghost lg" href="https://joinpond.ai" rel="noopener" style="width:100%">Ask on Pond</a>
+        <a class="btn outline lg" href="https://joinpond.ai" rel="noopener" style="width:100%">Ask on Pond</a>
       </div>
     </div>
 
-    <div class="faq narrow" style="margin-left:auto;margin-right:auto">
+    <div class="faq narrow rise" style="margin-left:auto;margin-right:auto">
       <details class="q" open>
         <summary>What counts as one test?</summary>
-        <p>One finished test of one site, however many pages it opened and however many issues it found.</p>
+        <p>One finished test of one site &mdash; however many pages it opened, however many issues it found.</p>
       </details>
       <details class="q">
         <summary>What if Owly cannot reach my site?</summary>
-        <p>Then it is not a result and it is not counted. A run that could not open a single page says exactly that instead of reporting no issues.</p>
+        <p>Then it is not a result and it is not counted. A run that could not open a single page says exactly that, rather than reporting no issues.</p>
       </details>
       <details class="q">
         <summary>Do I have to verify my site?</summary>
@@ -100,15 +104,15 @@
   </div>
 </section>
 
-<section style="padding-top:0">
-  <div class="w">
-    <div class="final">
-      <h2>Find out what a stranger hits.</h2>
-      <p>Five tests a month, free. The first one takes about ninety seconds.</p>
-      <div class="cta-row">
-        <a class="btn onBrand lg" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
-        <a class="btn outlineLight lg" href="/demo-report">See a real report</a>
-      </div>
+<section class="closer">
+  <span class="glow b"></span>
+  <div class="w narrow rise">
+    <img class="owl" src="/icon-192.png" alt="" width="92" height="92" decoding="async">
+    <h2>Find out what a stranger hits.</h2>
+    <p>Five tests a month, free. The first answer takes about ninety seconds.</p>
+    <div class="cta-row">
+      <a class="btn lav lg" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
+      <a class="btn outline lg" href="/demo-report">Read a real report</a>
     </div>
   </div>
 </section>
@@ -118,18 +122,19 @@
 <footer class="site">
   <div class="w">
     <div class="cols">
-      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="30" height="30" decoding="async"> Owly</a>
+      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
       <div class="links">
-        <a href="/how-it-works">How it works</a>
-        <a href="/pricing">Pricing</a>
-        <a href="/demo-report">Example report</a>
-        <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
-        <a href="https://joinpond.ai" rel="noopener">Pond</a>
+        <a href="/how-it-works">how it works</a>
+        <a href="/pricing">pricing</a>
+        <a href="/demo-report">a real report</a>
+        <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
+        <a href="https://joinpond.ai" rel="noopener">pond</a>
       </div>
     </div>
     <p class="fine">Owly is rule-based checks and scripted user behaviour in a real browser. It does not guess, and nothing reaches a report unless the browser recorded it twice.</p>
   </div>
 </footer>
 
+<script src="/assets/site.js" defer></script>
 </body>
 </html>

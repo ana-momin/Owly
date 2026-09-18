@@ -4,88 +4,96 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>How Owly works</title>
-<meta name="description" content="What Owly does during a test, how it proves a problem before reporting it, how to verify your site, and what it deliberately will not do.">
+<meta name="description" content="Four phases, one rule: nothing is reported unless it happened twice. What Owly does during a test, how to verify your site, and what it deliberately will not do.">
 <link rel="icon" href="/icon-32.png" sizes="32x32">
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="/icon-180.png">
-<meta name="theme-color" content="#232338">
+<meta name="theme-color" content="#0d0c1a">
 <meta property="og:type" content="website">
 <meta property="og:title" content="How Owly works">
 <meta property="og:description" content="Four phases, one rule: nothing is reported unless it happened twice.">
 <meta property="og:image" content="https://tryowly.vercel.app/logo.png">
 <meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
 
 <header class="site">
   <div class="w">
-    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="30" height="30" decoding="async"> Owly</a>
+    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
     <nav class="main">
-      <a href="/how-it-works" aria-current="page">How it works</a>
-      <a href="/pricing">Pricing</a>
-      <a href="/demo-report">Example report</a>
+      <a href="/how-it-works" aria-current="page">how it works</a>
+      <a href="/pricing">pricing</a>
+      <a href="/demo-report">a real report</a>
     </nav>
-    <a class="btn primary" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
+    <a class="btn lav" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
   </div>
 </header>
-  <div class="mobile-nav">
-    <a href="/how-it-works" aria-current="page">How it works</a>
-    <a href="/pricing">Pricing</a>
-    <a href="/demo-report">Example report</a>
-    <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
-  </div>
+<div class="mobile-nav">
+  <a href="/how-it-works" aria-current="page">how it works</a>
+  <a href="/pricing">pricing</a>
+  <a href="/demo-report">a real report</a>
+  <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
+</div>
 
 <main>
 
-<div class="hero compact">
-  <div class="w">
-    <span class="eyebrow">How it works</span>
-    <h1 class="display">One rule: it has to happen twice.</h1>
+<div class="hero">
+  <span class="glow a"></span><span class="glow b"></span>
+  <div class="w narrow">
+    <span class="kicker">How it works</span>
+    <h1 class="big">One rule: it has to <em class="it">happen twice</em>.</h1>
     <p class="lede">A bug report you cannot trust costs more time than the bug. So Owly proves everything it says before it says it.</p>
   </div>
 </div>
 
-<section style="padding-top:0">
+<section class="day">
   <div class="w">
-    <div class="grid g2">
-      <div class="card">
-        <div class="n">Phase 1</div>
-        <h3>Discover</h3>
-        <p>Owly opens your site as a new desktop visitor, follows your most prominent call to action, and runs its checks on every page it reaches.</p>
+    <div class="rise">
+      <span class="kicker">One run</span>
+      <h2 class="big">Four phases, about <em class="it">ninety seconds</em>.</h2>
+    </div>
+    <div class="steps rise">
+      <div class="stepline">
+        <div class="num">01</div>
+        <div>
+          <h3>Discover</h3>
+          <p>Owly opens your site as a new desktop visitor, follows the most prominent call to action, and runs its checks on every page it reaches.</p>
+        </div>
       </div>
-      <div class="card">
-        <div class="n">Phase 2</div>
-        <h3>Personas</h3>
-        <p>The same pages again, twice: as an impatient phone user on a 390px screen, and as someone using only a keyboard.</p>
+      <div class="stepline">
+        <div class="num">02</div>
+        <div>
+          <h3>Personas</h3>
+          <p>The same pages twice more: as an impatient phone user on a 390px screen, and as someone using only a keyboard.</p>
+        </div>
       </div>
-      <div class="card">
-        <div class="n">Phase 3</div>
-        <h3>Verify</h3>
-        <p>Every suspected problem is replayed in a fresh browser. Anything that does not happen again is held back and listed as unverified.</p>
+      <div class="stepline">
+        <div class="num">03</div>
+        <div>
+          <h3>Verify</h3>
+          <p>Every suspected problem is replayed in a fresh browser. Anything that does not happen again is held back and listed as unverified, not as a bug.</p>
+        </div>
       </div>
-      <div class="card">
-        <div class="n">Phase 4</div>
-        <h3>Report</h3>
-        <p>Duplicates are clustered, secrets are redacted, and you get a page that opens with the answer and backs it with screenshots.</p>
+      <div class="stepline">
+        <div class="num">04</div>
+        <div>
+          <h3>Report</h3>
+          <p>Duplicates are clustered, secrets are redacted, and you get a page that opens with the answer and backs it with screenshots.</p>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="band">
-  <div class="w narrow center">
-    <span class="eyebrow">The verdict</span>
-    <h2 class="section" style="margin-left:auto;margin-right:auto">Reports start with the answer.</h2>
-    <p class="lede">Not a list of 47 console warnings. One sentence a founder can act on, then the evidence underneath it.</p>
-    <p style="margin-top:32px"><a class="btn onDark lg" href="/demo-report">Read a real report</a></p>
-  </div>
-</section>
-
 <section>
+  <span class="glow c"></span>
   <div class="w narrow prose">
-    <span class="eyebrow">Verification</span>
-    <h2 class="section">Proving the site is yours</h2>
+    <span class="kicker">Verification</span>
+    <h2 class="big" style="margin-bottom:26px">Proving the site is <em class="it">yours</em>.</h2>
     <p>Any site can be looked at. To let Owly type into forms and press buttons, publish a token it derives from your hostname. Any one of these works:</p>
 <pre class="code">/.well-known/owly-verification.txt      contains the token
 
@@ -101,19 +109,22 @@ DNS TXT   owly-verification=owly-...</pre>
     <p>Anything that needs judgement: a confusing label, an unhelpful error message, a total that is wrong but renders perfectly. Owly is honest about this rather than pretending &mdash; its own benchmark counts those as misses.</p>
 
     <h2>How good is it, actually</h2>
-    <p>Owly is scored against a lab of deliberately broken apps plus one control app with nothing wrong. Current score: <strong>19 of 19</strong> of the defects it is built to detect, <strong>100% precision</strong>, <strong>zero</strong> false positives on the control, <strong>zero</strong> safety-rule violations. The build fails if any of those slip.</p>
+    <p>Owly is scored against a lab of deliberately broken apps plus one control app with nothing wrong at all. Current score: <strong>19 of 19</strong> of the defects it is built to detect, <strong>100% precision</strong>, <strong>zero</strong> false positives on the control, <strong>zero</strong> safety-rule violations. The build fails if any of those slip.</p>
+
+    <h2>And when it cannot reach you</h2>
+    <p>A run where no page opened says exactly that. It is never presented as a clean bill of health, and it is not counted against your free tests.</p>
   </div>
 </section>
 
-<section style="padding-top:0">
-  <div class="w">
-    <div class="final">
-      <h2>Ninety seconds to your first answer.</h2>
-      <p>Five tests a month, free.</p>
-      <div class="cta-row">
-        <a class="btn onBrand lg" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
-        <a class="btn outlineLight lg" href="/pricing">See pricing</a>
-      </div>
+<section class="closer">
+  <span class="glow b"></span>
+  <div class="w narrow rise">
+    <img class="owl" src="/icon-192.png" alt="" width="92" height="92" decoding="async">
+    <h2>See it on a real site.</h2>
+    <p>A full report of a small site whose signup fails on purpose &mdash; screenshots and all.</p>
+    <div class="cta-row">
+      <a class="btn lav lg" href="/demo-report">Read the report</a>
+      <a class="btn outline lg" href="/pricing">Pricing</a>
     </div>
   </div>
 </section>
@@ -123,18 +134,19 @@ DNS TXT   owly-verification=owly-...</pre>
 <footer class="site">
   <div class="w">
     <div class="cols">
-      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="30" height="30" decoding="async"> Owly</a>
+      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
       <div class="links">
-        <a href="/how-it-works">How it works</a>
-        <a href="/pricing">Pricing</a>
-        <a href="/demo-report">Example report</a>
-        <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
-        <a href="https://joinpond.ai" rel="noopener">Pond</a>
+        <a href="/how-it-works">how it works</a>
+        <a href="/pricing">pricing</a>
+        <a href="/demo-report">a real report</a>
+        <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
+        <a href="https://joinpond.ai" rel="noopener">pond</a>
       </div>
     </div>
     <p class="fine">Owly is rule-based checks and scripted user behaviour in a real browser. It does not guess, and nothing reaches a report unless the browser recorded it twice.</p>
   </div>
 </footer>
 
+<script src="/assets/site.js" defer></script>
 </body>
 </html>
