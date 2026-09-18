@@ -1,4 +1,4 @@
-import { html, json, page, jsonBody, type LabApp } from "../kit.js";
+import { html, json, page, jsonBody, redirect, type LabApp } from "../kit.js";
 
 // App G - the control. NOTHING is wrong here, on purpose.
 //
@@ -16,7 +16,7 @@ import { html, json, page, jsonBody, type LabApp } from "../kit.js";
 //   - a button that opens and closes a dialog that Escape closes properly
 
 const nav = `<header><nav aria-label="Main"><a href="/">Ledgerly</a> <a href="/pricing">Pricing</a> <a href="/contact">Contact</a></nav></header>`;
-const foot = `<footer><p>Made in Lahore. <a href="https://example.com/">Our partner</a></p></footer>`;
+const foot = `<footer><p>Made in Lahore. <a href="https://example.com/">Our partner</a> · <a href="/partner">Partner sign-in</a> · <a href="/status.json">Service status</a></p></footer>`;
 
 export const app: LabApp = {
   key: "g",
@@ -127,6 +127,17 @@ export const app: LabApp = {
             out.textContent = r.ok ? "Account created. Welcome to Ledgerly." : "We couldn't create your account. Please try again.";
           });
         </script>`)),
+
+    // A perfectly ordinary outbound redirect: plenty of real sites have one
+    // (/slack/install, /login/google, affiliate links). Owly's guard refuses
+    // to follow it off-site, which once left a blank page that Owly then
+    // reported as a dead end - a false positive of its own making.
+    "GET /partner": (ctx) => redirect(ctx, "https://example.com/", 302),
+
+    // A linked JSON endpoint, as most sites have (/healthz, /manifest,
+    // /api/status). Chromium wraps JSON in a generated page with no title and
+    // no lang, and Owly once reported all three as defects.
+    "GET /status.json": (ctx) => json(ctx, { status: "ok", version: "1.0.0" }),
 
     "POST /api/contact": (ctx) => {
       const d = jsonBody<{ email?: string }>(ctx.body) ?? {};

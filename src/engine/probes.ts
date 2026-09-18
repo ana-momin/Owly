@@ -208,13 +208,46 @@ function passiveCandidates(
 // ---------------------------------------------------------------------------
 
 /** Load a page, report what it does on its own, and learn its links. */
-export async function loadUnit(s: Session, url: string): Promise<UnitResult & { status: number | null; finalUrl: string }> {
+export async function loadUnit(
+  s: Session,
+  url: string,
+): Promise<UnitResult & { status: number | null; finalUrl: string; leftTheSite: string | null; notHtml: string | null }> {
   const unit = unitKey(s.opts.persona.key, "load", url);
   const mark = s.mark();
   const status = await s.goto(url);
   const finalUrl = s.page.url();
   const steps = [`Open ${url}`, "Wait for the page to finish loading"];
-  const result: UnitResult & { status: number | null; finalUrl: string } = { candidates: [], discovered: [], notes: [], status, finalUrl };
+  const result: UnitResult & { status: number | null; finalUrl: string; leftTheSite: string | null; notHtml: string | null } = {
+    candidates: [],
+    discovered: [],
+    notes: [],
+    status,
+    finalUrl,
+    leftTheSite: null,
+    notHtml: null,
+  };
+
+  // A URL that redirects off the site - /slack/install, /login/google, an
+  // affiliate link - is refused by the guard, which leaves the browser on
+  // whatever it was showing before. Analysing that would describe a page the
+  // site never served: it once produced "dead end: no links, buttons or
+  // forms" for a redirect that works perfectly.
+  const refused = s.since(mark).blocked.find((b) => !sameOrigin(b.url, s.opts.target));
+  if (refused || !sameOrigin(finalUrl || url, s.opts.target)) {
+    result.leftTheSite = refused?.url ?? finalUrl;
+    result.notes.push(`${path(url)} leads off the site (to ${new URL(result.leftTheSite).origin}), so Owly stopped there.`);
+    return result;
+  }
+
+  // An API endpoint is not a page. Chromium renders JSON inside a generated
+  // HTML document with no <title> and no lang, and judging that document
+  // produced three confident findings about a perfectly good /healthz.
+  const contentType = s.lastContentType ?? "";
+  if (contentType && !/text\/html|application\/xhtml/i.test(contentType)) {
+    result.notHtml = contentType.split(";")[0]!.trim();
+    result.notes.push(`${path(url)} is ${result.notHtml}, not a web page, so Owly did not test it.`);
+    return result;
+  }
 
   if (status !== null && status >= 400) return result;
 

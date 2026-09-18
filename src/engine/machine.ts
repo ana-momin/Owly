@@ -362,6 +362,21 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
           continue;
         }
         const loaded = outcome.value;
+        // A page that redirects off the site is not a page of this site. It is
+        // recorded as visited so it is not tried again, and nothing is checked
+        // on it - the browser is not showing it.
+        if (loaded.leftTheSite || loaded.notHtml) {
+          pages.set(url, null);
+          state.notes.push(...loaded.notes);
+          emit(
+            state,
+            "info",
+            loaded.notHtml
+              ? `${new URL(url).pathname} is ${loaded.notHtml}, not a page; not tested`
+              : `${new URL(url).pathname} leads off the site; not tested`,
+          );
+          continue;
+        }
         pages.set(url, loaded.status);
         if (loaded.status !== null && loaded.status >= 400) {
           emit(state, "warn", `${new URL(url).pathname} answered HTTP ${loaded.status}`);

@@ -60,10 +60,16 @@ AI.
 
 | Step | State | Evidence |
 |---|---|---|
-| 0: skeleton, config, safety modules | **done** | URL guard, redactor, action guard. 95 tests; `tests/mutation.mjs` removes each protection in turn and all 10 removals are caught. |
+| 0: skeleton, config, safety modules | **done** | URL guard, redactor, action guard. `tests/mutation.mjs` removes each protection in turn and all 10 removals are caught. |
 | 1: test lab + ground truth + scorer | **done** | Apps A–H on their own ports. `truth.json` lists 21 planted defects: 18 deterministic, 3 that need a model. An empty engine scores 0. |
 | 2: browser, detectors, guards in a real browser | **done** | See the benchmark below. |
-| 3–7: engine as resumable slices, Pond API, report pages | next | |
+| 3: engine as resumable slices | **done** | `advance()` on plain JSON state; identical findings whether sliced once or one item at a time. |
+| 4: ownership verification | **done** | File, meta tag or DNS TXT. Unverified sites get a passive scan that presses nothing. |
+| 5: Pond API + report pages | **done** | Manifest validated against Pond's schema; parameters enforced; idempotent; one result billed per finished test. |
+| 6: deployed | **done** | https://tryowly.vercel.app on its own Vercel project, its own Neon database, its own GitHub repo. |
+| 7: live conformance | **done** | `tools/conformance.ts` passes **19/19** against the live deployment. |
+| 8: real sites | **in progress** | First real target found three false positives and two live bugs; all fixed (below). |
+| 9: list on Pond | waiting on Ana | |
 
 **Benchmark, 2026-09-17 (`npm run bench`):**
 
@@ -99,6 +105,23 @@ AI.
 - `tests/guard.browser.test.ts` runs every attack in an **unguarded** browser
   first, where it has to succeed, then in Owly's session, where it has to fail.
   Without that first half, a pass could just mean the attack never happened.
+
+### What deploying, and one real site, taught
+
+Five faults, none of which any local test could have found. They are the
+argument for testing from the other side, every time.
+
+| Fault | How it showed | Fix |
+|---|---|---|
+| **`/api/tasks/:id` was a platform 404** - the endpoint Pond polls | Live conformance, 14/18. A `[...route]` catch-all matches a *single* path segment on plain Vercel functions | One file per path, and `tests/routes.test.ts` ties every Pond path to a file |
+| **The short report link 404'd** | `/r/:id` rewrite hands the app the *original* path, so the `/api` base never matched. (Foxy's notes said the opposite - worth testing, not assuming) | The app answers `/r/:id` as well |
+| **Chromium died mid-run** | Serverless Chromium is single-process; opening and closing a scratch page to read the user agent closed the browser | User agent built from the version; a keeper context holds the browser open |
+| **A slice ran 123s and Vercel killed it** | The first real site. The slice budget was only checked *between* items, and a page can hang an evaluation forever | A hard per-item limit, one retry, then skip with a note. `tests/hang.browser.test.ts` uses a page that locks its own main thread |
+| **Three false positives on a real site** | `/slack/install` (a redirect Owly itself blocked, leaving a blank page, reported as a dead end), `/manifest` and `/healthz` (JSON, reported as having no title and no lang) | A page that leaves the site or is not HTML is recorded as such and not judged. Findings on that site went 6 → 2, and both survivors are real |
+
+The two that survived are genuine accessibility problems on `tryfoxy.vercel.app`:
+text at contrast 3.67 against white (4.5 required), and links distinguishable
+only by colour.
 
 ---
 

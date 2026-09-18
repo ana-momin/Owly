@@ -316,9 +316,13 @@ export class Session {
    */
   async goto(url: string, patienceMs = this.opts.persona.patienceMs, timeoutMs = 20_000): Promise<number | null> {
     const response = await this.page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs }).catch(() => null);
+    this.lastContentType = response?.headers()["content-type"] ?? null;
     await this.settle(patienceMs);
     return response?.status() ?? null;
   }
+
+  /** Content type of the last document navigation, for deciding if it is a page at all. */
+  lastContentType: string | null = null;
 
   async eval<T>(script: string): Promise<T> {
     return (await this.page.evaluate(script)) as T;
