@@ -159,19 +159,37 @@ export const FIND_OVERLAPS = `(() => {
   var els = [];
   var nodes = document.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, [role=button]');
   for (var i = 0; i < nodes.length; i++) if (owlyVisible(nodes[i])) els.push(nodes[i]);
+  // Per line, not one box round the whole element. An inline link that wraps
+  // across two lines has a bounding box covering both lines AND the gap
+  // between them, which made every neighbouring link in a wrapping footer look
+  // completely covered. getClientRects gives one box per line.
+  var boxesOf = function (el) {
+    var rects = el.getClientRects();
+    if (rects.length === 0) return [el.getBoundingClientRect()];
+    var out = [];
+    for (var i = 0; i < rects.length; i++) if (rects[i].width > 0 && rects[i].height > 0) out.push(rects[i]);
+    return out;
+  };
+
   var out = [];
   for (var a = 0; a < els.length; a++) {
     for (var b = a + 1; b < els.length; b++) {
       var x = els[a], y = els[b];
       if (x.contains(y) || y.contains(x)) continue;
-      var r1 = x.getBoundingClientRect(), r2 = y.getBoundingClientRect();
-      var w = Math.min(r1.right, r2.right) - Math.max(r1.left, r2.left);
-      var h = Math.min(r1.bottom, r2.bottom) - Math.max(r1.top, r2.top);
-      if (w <= 0 || h <= 0) continue;
-      var smaller = Math.min(r1.width * r1.height, r2.width * r2.height);
-      var share = (w * h) / smaller;
-      if (share >= 0.25) {
-        out.push({ first: owlyName(x) || owlyDescribe(x), second: owlyName(y) || owlyDescribe(y), share: Math.round(share * 100) });
+      var boxesX = boxesOf(x), boxesY = boxesOf(y);
+      var worst = 0;
+      for (var i = 0; i < boxesX.length; i++) {
+        for (var j = 0; j < boxesY.length; j++) {
+          var r1 = boxesX[i], r2 = boxesY[j];
+          var w = Math.min(r1.right, r2.right) - Math.max(r1.left, r2.left);
+          var h = Math.min(r1.bottom, r2.bottom) - Math.max(r1.top, r2.top);
+          if (w <= 0 || h <= 0) continue;
+          var smaller = Math.min(r1.width * r1.height, r2.width * r2.height);
+          if (smaller > 0) worst = Math.max(worst, (w * h) / smaller);
+        }
+      }
+      if (worst >= 0.25) {
+        out.push({ first: owlyName(x) || owlyDescribe(x), second: owlyName(y) || owlyDescribe(y), share: Math.round(worst * 100) });
       }
     }
   }

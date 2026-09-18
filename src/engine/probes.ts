@@ -548,20 +548,37 @@ interface Attempt {
   invalid: number;
 }
 
-async function fillAndSubmit(s: Session, url: string, form: FormInfo, emailOverride?: string): Promise<Attempt | null> {
+/**
+ * Long enough for a slow machine. These were 2 and 3 seconds, and on a
+ * two-core CI runner the very first fill after a page load exceeded it - the
+ * error was swallowed, the form was submitted EMPTY, the server accepted it,
+ * and Owly reported nothing at all about a signup that is broken. A silent
+ * catch turned a finding into a clean bill of health.
+ */
+const INTERACT_MS = 10_000;
+
+async function fillAndSubmit(
+  s: Session,
+  url: string,
+  form: FormInfo,
+  emailOverride?: string,
+): Promise<(Attempt & { problems: string[] }) | null> {
   await s.goto(url, READ_PATIENCE_MS);
   await s.eval(js.LIST_FORMS);
   const n = nonce();
+  const problems: string[] = [];
   for (const field of form.fields) {
     const value = emailOverride !== undefined && isEmailField(field) ? { kind: "text" as const, value: emailOverride } : valueFor(field, n);
     if (!value) continue;
     const loc = s.page.locator(`[data-owly-field="${field.key}"]`);
     try {
-      if (value.kind === "select") await loc.selectOption(value.value, { timeout: 2_000 });
-      else if (value.kind === "check") await loc.check({ timeout: 2_000 });
-      else await loc.fill(value.value, { timeout: 2_000 });
-    } catch {
-      /* a field that will not take input is itself not this unit's concern */
+      if (value.kind === "select") await loc.selectOption(value.value, { timeout: INTERACT_MS });
+      else if (value.kind === "check") await loc.check({ timeout: INTERACT_MS });
+      else await loc.fill(value.value, { timeout: INTERACT_MS });
+    } catch (err) {
+      // Never silent: a field Owly could not fill changes what the submission
+      // means, and the report has to be able to say so.
+      problems.push(`could not fill "${field.label || field.name || field.type}": ${String(err).split("\n")[0]}`);
     }
   }
 
@@ -569,9 +586,12 @@ async function fillAndSubmit(s: Session, url: string, form: FormInfo, emailOverr
   const mark = s.mark();
   const clicked = await s.page
     .locator(`[data-owly-submit="${form.index}"]`)
-    .click({ timeout: 3_000 })
+    .click({ timeout: INTERACT_MS })
     .then(() => true)
-    .catch(() => false);
+    .catch((err: unknown) => {
+      problems.push(`could not press the submit button: ${String(err).split("\n")[0]}`);
+      return false;
+    });
   if (!clicked) return null;
   await s.settle(Math.min(s.opts.persona.patienceMs, 8_000));
   const after = await s.eval<{ url: string; text: string; live: string; invalid: number }>(js.READ_STATE).catch(() => ({ url: s.page.url(), text: "", live: "", invalid: 0 }));
@@ -587,6 +607,7 @@ async function fillAndSubmit(s: Session, url: string, form: FormInfo, emailOverr
     textChanged: before.text !== after.text || before.live !== after.live,
     live: after.live,
     invalid: after.invalid,
+    problems,
   };
 }
 
@@ -624,9 +645,22 @@ export async function formsUnit(s: Session, url: string, maxForms = 3): Promise<
 
     // --- valid submission, repeated when it changes data -------------------
     const first = await fillAndSubmit(s, url, form);
-    if (!first) continue;
+    if (!first) {
+      result.notes.push(`Could not submit "${submitName}" on ${path(url)}, so it was not tested.`);
+      continue;
+    }
+    if (first.problems.length) {
+      // Said out loud rather than swallowed: a partly filled form means the
+      // result below is about a different submission than the one intended.
+      result.notes.push(`On ${path(url)}, ${first.problems.join("; ")}.`);
+    }
     const attempts: Attempt[] = [first];
-    if (first.requests.some(isMutation)) {
+    // Repeat only when the first attempt SUCCEEDED, to see whether the same
+    // request sometimes fails. A submission that already failed needs no
+    // repeats: verification replays the whole unit anyway, and three slow
+    // submissions per form is what pushed this unit past its time limit.
+    const firstSucceeded = first.requests.some((r) => isMutation(r) && r.status !== null && r.status >= 200 && r.status < 400);
+    if (firstSucceeded) {
       for (let i = 0; i < 2; i++) {
         const again = await fillAndSubmit(s, url, form);
         if (again) attempts.push(again);
