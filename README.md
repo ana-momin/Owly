@@ -82,6 +82,10 @@ done       cluster duplicates, redact, write the report
 **Nothing is reported unless it reproduced.** Anything seen once and not again
 is kept out of the findings and listed separately as unverified.
 
+And nothing is reported as clean unless something was tested: a run where no
+page of the site opened says so instead of showing an empty findings list, and
+is not charged as a result.
+
 ## Layout
 
 ```
@@ -100,7 +104,7 @@ tools/          conformance.ts - drives a live deployment the way Pond does
 npm install
 npx playwright install chromium
 
-npm test          # 188 tests, including real-browser ones against the lab
+npm test          # 190 tests, including real-browser ones against the lab
 npm run bench     # score the engine against the lab
 npm run lab       # serve the lab apps to poke at by hand
 
