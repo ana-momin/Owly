@@ -107,11 +107,12 @@ footer{padding:40px 0 60px;border-top:1px solid var(--line);color:var(--dim);fon
       <p class="lede">Owly opens your site in a real browser and tries: it follows your main call to action, fills the form in, presses the button. You get one straight answer, a picture of the screen where it stopped, and the problems it hit along the way.</p>
       <div class="cta">
         <a class="btn primary" href="https://joinpond.ai" rel="noopener">Use Owly on Pond</a>
+        <a class="btn ghost" href="/demo-report.html">See a real report</a>
         <a class="btn ghost" href="#how">How it works</a>
       </div>
     </div>
     <div>
-      <div class="card demo" role="img" aria-label="Example of two issues in an Owly report">
+      <div class="card demo" role="img" aria-label="Three findings from a real Owly report">
         <div class="bar"><span class="dot" style="background:#b3261e"></span><b>Example report</b> · full test</div>
         <div class="issue" style="border-color:#f3c4bf;background:#fdecea">
           <div class="top"><span class="sev h" style="background:#b3261e">Verdict</span><span class="t">A new visitor could not create an account</span></div>
@@ -120,15 +121,15 @@ footer{padding:40px 0 60px;border-top:1px solid var(--line);color:var(--dim);fon
 "Something went wrong. Please try again."</code>
         </div>
         <div class="issue">
-          <div class="top"><span class="sev h">High</span><span class="t">3 controls are covered by another element on /onboarding/1 at 390px</span></div>
-          <div class="c">Confirmed: seen 2 of 2 attempts · Impatient mobile user · 390x844</div>
+          <div class="top"><span class="sev h">High</span><span class="t">Submitting "Create account" fails on /signup.html</span></div>
+          <div class="c">Confirmed: seen 2 of 2 attempts · New user (desktop)</div>
         </div>
         <div class="issue">
-          <div class="top"><span class="sev m">Medium</span><span class="t">Page scrolls sideways on phones: / at 390px</span></div>
-          <div class="c">Confirmed: content extends 726px past the right edge</div>
+          <div class="top"><span class="sev m">Medium</span><span class="t">Nothing happens after pressing "Sign in" on /login.html</span></div>
+          <div class="c">Likely: no request was sent, the page did not change, no message appeared</div>
         </div>
       </div>
-      <p class="caption">Real findings, word for word, from Owly's test lab of deliberately broken apps.</p>
+      <p class="caption">Word for word from a real test. <a href="/demo-report.html">Open the whole report</a> - the site, the steps, the screenshots.</p>
     </div>
   </div>
 

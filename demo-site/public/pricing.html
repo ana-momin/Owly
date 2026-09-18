@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus pricing</title>
+<style>
+  :root { --ink:#11131a; --dim:#5b6270; --line:#e5e7eb; --brand:#3b5bdb; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:#fff; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:20px 28px; border-bottom:1px solid var(--line); }
+  .logo { font-weight:700; letter-spacing:-.02em; }
+  nav a { color:var(--dim); text-decoration:none; margin-left:20px; font-size:14px; }
+  main { max-width:760px; margin:0 auto; padding:64px 24px; }
+  h1 { font-size:34px; letter-spacing:-.03em; margin:0 0 32px; }
+  .plans { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px; }
+  .plan { border:1px solid var(--line); border-radius:14px; padding:24px; }
+  .plan h2 { margin:0 0 4px; font-size:18px; }
+  .price { font-size:32px; font-weight:700; letter-spacing:-.02em; }
+  .price span { font-size:14px; font-weight:400; color:var(--dim); }
+  ul { padding-left:18px; color:var(--dim); font-size:15px; }
+  .cta { display:block; text-align:center; background:var(--brand); color:#fff; text-decoration:none;
+         font-weight:600; padding:12px; border-radius:9px; margin-top:16px; }
+</style>
+</head>
+<body>
+<header><span class="logo">Nimbus</span><nav><a href="/">Home</a><a href="/signup.html">Sign up</a></nav></header>
+<main>
+  <h1>Pricing</h1>
+  <div class="plans">
+    <div class="plan">
+      <h2>Free</h2>
+      <p class="price">0<span> / month</span></p>
+      <ul><li>5 invoices</li><li>1 client</li><li>Email support</li></ul>
+      <a class="cta" href="/signup.html">Create a free account</a>
+    </div>
+    <div class="plan">
+      <h2>Studio</h2>
+      <p class="price">12<span> / month</span></p>
+      <ul><li>Unlimited invoices</li><li>Automatic reminders</li><li>Your own logo</li></ul>
+      <a class="cta" href="/signup.html">Start free</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

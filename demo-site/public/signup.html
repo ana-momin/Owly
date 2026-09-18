@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create your Nimbus account</title>
+<style>
+  :root { --ink:#11131a; --dim:#5b6270; --line:#e5e7eb; --brand:#3b5bdb; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:#f7f8fa; }
+  header { padding:20px 28px; border-bottom:1px solid var(--line); background:#fff; }
+  .logo { font-weight:700; letter-spacing:-.02em; }
+  main { max-width:420px; margin:56px auto; background:#fff; border:1px solid var(--line); border-radius:14px; padding:32px; }
+  h1 { font-size:24px; margin:0 0 4px; letter-spacing:-.02em; }
+  .lede { color:var(--dim); font-size:15px; margin:0 0 24px; }
+  label { display:block; font-size:14px; font-weight:600; margin:16px 0 6px; }
+  input { width:100%; padding:11px 13px; border:1px solid #cbd0d8; border-radius:9px; font-size:15px; font-family:inherit; }
+  input:focus { outline:2px solid var(--brand); outline-offset:1px; border-color:var(--brand); }
+  button { width:100%; margin-top:24px; background:var(--brand); color:#fff; border:0; border-radius:9px;
+           padding:13px; font-size:16px; font-weight:600; font-family:inherit; cursor:pointer; }
+  button:hover { background:#324bb8; }
+  button[disabled] { opacity:.6; cursor:default; }
+  #msg { margin-top:18px; font-size:14px; display:none; padding:12px 14px; border-radius:9px; }
+  #msg.bad { display:block; background:#fdecec; color:#8c1c1c; border:1px solid #f3c2c2; }
+  #msg.good { display:block; background:#e9f7ef; color:#14532d; border:1px solid #bfe6cd; }
+  .alt { text-align:center; margin-top:20px; font-size:14px; color:var(--dim); }
+  .alt a { color:var(--brand); }
+</style>
+</head>
+<body>
+<header><span class="logo">Nimbus</span></header>
+<main>
+  <h1>Create your account</h1>
+  <p class="lede">Free for your first 5 invoices.</p>
+  <form id="f" novalidate>
+    <label for="name">Full name</label>
+    <input id="name" name="name" type="text" autocomplete="name" required>
+    <label for="email">Work email</label>
+    <input id="email" name="email" type="email" autocomplete="email" required>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="new-password" required>
+    <button type="submit" id="go">Create account</button>
+  </form>
+  <p id="msg" role="alert"></p>
+  <p class="alt">Already have an account? <a href="/login.html">Sign in</a></p>
+</main>
+<script>
+  var f = document.getElementById("f");
+  var msg = document.getElementById("msg");
+  var go = document.getElementById("go");
+  f.addEventListener("submit", function (e) {
+    e.preventDefault();
+    go.disabled = true;
+    go.textContent = "Creating account...";
+    msg.className = "";
+    fetch("/api/signup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: document.getElementById("name").value,
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value
+      })
+    }).then(function (r) {
+      return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+    }).then(function (r) {
+      go.disabled = false;
+      go.textContent = "Create account";
+      if (r.ok) { msg.className = "good"; msg.textContent = "Welcome to Nimbus."; return; }
+      msg.className = "bad";
+      msg.textContent = "Something went wrong. Please try again.";
+    });
+  });
+</script>
+</body>
+</html>

@@ -6,3 +6,4 @@ tools
 .github
 *.md
 .env*
+demo-site

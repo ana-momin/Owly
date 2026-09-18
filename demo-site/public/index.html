@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus - invoicing for people who hate invoicing</title>
+<style>
+  :root { --ink:#11131a; --dim:#5b6270; --line:#e5e7eb; --brand:#3b5bdb; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:#fff; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:20px 28px; border-bottom:1px solid var(--line); }
+  .logo { font-weight:700; letter-spacing:-.02em; }
+  nav a { color:var(--dim); text-decoration:none; margin-left:20px; font-size:14px; }
+  main { max-width:760px; margin:0 auto; padding:80px 24px 96px; text-align:center; }
+  h1 { font-size:46px; line-height:1.1; letter-spacing:-.03em; margin:0 0 18px; }
+  p.lede { font-size:19px; color:var(--dim); margin:0 auto 36px; max-width:520px; }
+  .cta { display:inline-block; background:var(--brand); color:#fff; text-decoration:none; font-weight:600;
+         padding:15px 32px; border-radius:10px; font-size:17px; }
+  .cta:hover { background:#324bb8; }
+  .sub { margin-top:14px; font-size:14px; color:var(--dim); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:28px; margin-top:80px; text-align:left; }
+  .grid h3 { margin:0 0 6px; font-size:16px; }
+  .grid p { margin:0; color:var(--dim); font-size:15px; }
+  footer { border-top:1px solid var(--line); padding:24px 28px; color:var(--dim); font-size:13px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">Nimbus</span>
+  <nav><a href="/pricing.html">Pricing</a><a href="/signup.html">Sign up</a></nav>
+</header>
+<main>
+  <h1>Invoices that get paid on time</h1>
+  <p class="lede">Send an invoice in twenty seconds, chase it automatically, and never open a spreadsheet again.</p>
+  <a class="cta" href="/signup.html">Create a free account</a>
+  <p class="sub">Free for your first 5 invoices. No card needed.</p>
+
+  <div class="grid">
+    <div><h3>Send in seconds</h3><p>Pick a client, pick a rate, send. The layout is already done.</p></div>
+    <div><h3>Automatic chasing</h3><p>Polite reminders go out on their own until the invoice is paid.</p></div>
+    <div><h3>Know what is owed</h3><p>One number at the top of the page: what is outstanding today.</p></div>
+  </div>
+</main>
+<footer>A demonstration site. Nimbus is not a real company. Its signup and its sign-in form are broken on purpose.</footer>
+</body>
+</html>

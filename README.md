@@ -12,6 +12,10 @@ as a new desktop user, as an impatient phone user, and with only a keyboard.
 
 **Live:** https://tryowly.vercel.app · **On Pond:** ask it to test your site.
 
+**A real report:** https://tryowly.vercel.app/demo-report.html - Owly testing
+`owly-demo-rho.vercel.app`, a small site in `demo-site/` whose signup fails on
+purpose. Nothing in it is staged: the screenshots are what the browser showed.
+
 It is not an AI in its checks. Owly runs rule-based checks and scripted user
 behaviour, and everything it reports comes from something the browser actually
 recorded. The conversation you have with it is Pond's.
