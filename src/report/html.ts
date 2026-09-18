@@ -32,7 +32,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.6 ui-sans-s
 a{color:var(--accent)}
 .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.02em;text-decoration:none;color:var(--ink)}
-.brand svg{width:26px;height:26px}
+.brand img{width:26px;height:26px;border-radius:7px;display:block}
 .meta{display:flex;gap:7px;flex-wrap:wrap}
 .pill{font-size:12px;padding:4px 9px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--ink2)}
 
@@ -51,10 +51,10 @@ a{color:var(--accent)}
 .frame{flex:none;width:230px;scroll-snap-align:start;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper);text-align:left;padding:0;font:inherit;cursor:zoom-in}
 .frame[disabled]{cursor:default}
 .frame img{display:block;width:100%;height:132px;object-fit:cover;object-position:top;background:#fff;border-bottom:1px solid var(--line)}
-.frame .cap{padding:9px 11px}
-.frame .n{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
-.frame .act{font-size:13.5px;font-weight:600;letter-spacing:-.01em;margin:1px 0 3px;line-height:1.3}
-.frame .out{font-size:12.5px;color:var(--ink2);line-height:1.35}
+.frame .cap{display:block;padding:9px 11px;overflow-wrap:anywhere}
+.frame .n{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.frame .act{display:block;font-size:13.5px;font-weight:600;letter-spacing:-.01em;margin:1px 0 3px;line-height:1.3}
+.frame .out{display:block;font-size:12.5px;color:var(--ink2);line-height:1.35}
 .frame.bad{border-color:#f3c4bf;background:var(--bad-bg)}
 .frame.bad .out{color:var(--bad)}
 dialog{border:0;border-radius:14px;padding:0;max-width:min(1100px,94vw);box-shadow:0 30px 60px -20px rgba(0,0,0,.5)}
@@ -104,7 +104,7 @@ button.btn{font:inherit;font-size:13.5px;font-weight:600;padding:9px 14px;border
 footer{margin-top:44px;color:var(--dim);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
 `;
 
-const LOGO = `<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#14161b"/><circle cx="11.5" cy="15" r="4" fill="#fff"/><circle cx="20.5" cy="15" r="4" fill="#fff"/><circle cx="11.5" cy="15" r="1.6" fill="#14161b"/><circle cx="20.5" cy="15" r="1.6" fill="#14161b"/><path d="M14 21l2 2 2-2" stroke="#f5b73b" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const LOGO = `<img src="/icon-64.png" alt="" width="26" height="26" decoding="async">`;
 const TICK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
 const CROSS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 const EYE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
@@ -134,6 +134,15 @@ function shotButton(src: string, caption: string, className = "shot"): string {
 
 /** The answer, at the top, in one sentence. */
 function verdictBlock(report: RunReport): string {
+  // Nothing opened: say that, in the place the answer goes. A page that looked
+  // like every other clean report would be read as one.
+  if (report.failed) {
+    return `<section class="verdict no"><div class="head">
+      <span class="mark">${CROSS}</span>
+      <div><h1>${esc(report.failed)}</h1>
+      <p class="why">Nothing was tested, so this is not a clean bill of health. Check the address, whether the site is up, and whether it is reachable from the public internet.</p></div>
+    </div></section>`;
+  }
   const j = report.journey;
   if (!j) {
     return `<section class="verdict idle"><div class="head">
@@ -223,6 +232,9 @@ function shell(title: string, body: string, nonce: string, script = ""): string 
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
+<link rel="icon" href="/icon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#2b2b3f">
 <title>${esc(title)}</title>
 <style>${CSS}</style>
 </head><body><div class="w">
@@ -289,7 +301,7 @@ ${verdictBlock(report)}
 ${blocking.length ? `<h2>Fix first</h2>${blocking.map((f, i) => findingCard(f, report, i)).join("")}` : ""}
 ${rest.length ? `<h2>Also found</h2>${rest.map((f, i) => findingCard(f, report, blocking.length + i)).join("")}` : ""}
 ${access.length ? `<h2>Accessibility (${access.length})</h2>${access.map((f, i) => findingCard(f, report, blocking.length + rest.length + i)).join("")}` : ""}
-${report.findings.length === 0 ? `<div class="empty">No issues reproduced. Every suspected problem was checked again in a fresh browser before it could be listed here.</div>` : ""}
+${report.findings.length === 0 && !report.failed ? `<div class="empty">No issues reproduced. Every suspected problem was checked again in a fresh browser before it could be listed here.</div>` : ""}
 
 ${report.unverified.length ? `<h2>Seen once, not reproduced</h2><p class="muted">These happened during the test but not again on replay, so they are not counted as issues.</p><ul class="muted">${report.unverified.map((f) => `<li>${esc(f.title)}</li>`).join("")}</ul>` : ""}
 ${refused.length ? `<h2>What Owly would not do</h2><ul class="muted">${refused.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}

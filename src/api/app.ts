@@ -248,8 +248,9 @@ export function createApp(deps: AppDeps): Hono {
       task_id: id,
       status: "completed",
       output: [{ type: "text", text: `${pondMarkdown(report, reportUrl(c, id))}\n\nTest id: \`${id}\`` }],
-      // One finished test is one result, whatever it found.
-      usage: usage(1),
+      // One finished test is one result, whatever it found - but a test that
+      // could not open the site is not a result and is not charged for.
+      usage: usage(report.failed ? 0 : 1),
     });
   });
 

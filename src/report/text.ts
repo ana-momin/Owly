@@ -71,6 +71,16 @@ export function pondMarkdown(report: RunReport, reportUrl: string | null, limit 
   const lines: string[] = [];
   lines.push(`## Owly report: ${host(report.target)}`);
 
+  // A run that could not open the site has nothing to say about the site, and
+  // saying "no issues" here would be a lie by omission.
+  if (report.failed) {
+    lines.push("", `### ${report.failed}`, "");
+    lines.push("Nothing was tested, so this is not a clean bill of health. Check the address, whether the site is up, and whether it is reachable from the public internet.");
+    for (const n of report.notes) lines.push(`- ${n}`);
+    if (reportUrl) lines.push("", `[What Owly tried](${reportUrl})`);
+    return lines.join("\n");
+  }
+
   // The verdict first. It is the one line a founder actually wants, and a list
   // of console errors is not it.
   const j = report.journey;

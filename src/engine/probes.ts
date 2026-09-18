@@ -207,17 +207,26 @@ function passiveCandidates(
 
 // ---------------------------------------------------------------------------
 
+export type LoadResult = UnitResult & {
+  status: number | null;
+  finalUrl: string;
+  leftTheSite: string | null;
+  notHtml: string | null;
+  /** Nothing answered at all. A run of these must not read like a clean bill of health. */
+  unreachable: string | null;
+};
+
 /** Load a page, report what it does on its own, and learn its links. */
 export async function loadUnit(
   s: Session,
   url: string,
-): Promise<UnitResult & { status: number | null; finalUrl: string; leftTheSite: string | null; notHtml: string | null }> {
+): Promise<LoadResult> {
   const unit = unitKey(s.opts.persona.key, "load", url);
   const mark = s.mark();
   const status = await s.goto(url);
   const finalUrl = s.page.url();
   const steps = [`Open ${url}`, "Wait for the page to finish loading"];
-  const result: UnitResult & { status: number | null; finalUrl: string; leftTheSite: string | null; notHtml: string | null } = {
+  const result: LoadResult = {
     candidates: [],
     discovered: [],
     notes: [],
@@ -225,6 +234,7 @@ export async function loadUnit(
     finalUrl,
     leftTheSite: null,
     notHtml: null,
+    unreachable: null,
   };
 
   // A URL that redirects off the site - /slack/install, /login/google, an
@@ -236,6 +246,17 @@ export async function loadUnit(
   // the page tried. A page that redirects itself off-site is refused with a 204
   // and stays put, and that page is still worth testing: treating the attempt
   // as leaving cost the injection-trap app every page but its first.
+  // Nothing answered. The browser is still on about:blank, whose origin is the
+  // string "null", so the off-site check below would have announced that the
+  // page "leads off the site (to null)" and let the run finish looking clean.
+  // A test that could not load the site has to say so.
+  const blank = !finalUrl || finalUrl === "about:blank" || finalUrl === "chrome-error://chromewebdata/";
+  if (status === null && blank) {
+    result.unreachable = `${path(url)} did not respond.`;
+    result.notes.push(`${path(url)} did not respond, so there was nothing to test.`);
+    return result;
+  }
+
   const refused = s.since(mark).blocked.find((b) => !sameOrigin(b.url, s.opts.target));
   const landedOnRequest = (() => {
     try {

@@ -104,6 +104,11 @@ export interface RunReport {
   events: RunEvent[];
   /** The attempt at the site's main task. The report leads with it. */
   journey: Journey | null;
+  /**
+   * Set when no page of the site could be opened. A run that tested nothing
+   * must never be presented as a site with no problems.
+   */
+  failed: string | null;
 }
 
 export interface RunState {
@@ -389,6 +394,12 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
         // A page that redirects off the site is not a page of this site. It is
         // recorded as visited so it is not tried again, and nothing is checked
         // on it - the browser is not showing it.
+        if (loaded.unreachable) {
+          pages.set(url, null);
+          state.notes.push(...loaded.notes);
+          emit(state, "warn", `${new URL(url).pathname} did not respond`);
+          continue;
+        }
         if (loaded.leftTheSite || loaded.notHtml) {
           pages.set(url, null);
           state.notes.push(...loaded.notes);
@@ -608,6 +619,15 @@ function finish(state: RunState, pages: Map<string, number | null>, sliceStart: 
   for (const b of state.blocked) state.notes.push(`Refused to go to ${b.url}: ${b.reason}.`);
 
   const okCount = [...pages.values()].filter((s) => s !== null && s < 400).length;
+  // "No issues" is only meaningful if something was actually tested. A run
+  // where nothing opened once reported a clean bill of health for a site it
+  // never reached, which is the worst thing this tool could say.
+  const failed =
+    okCount > 0
+      ? null
+      : [...pages.values()].every((s) => s === null)
+        ? `Owly could not open ${new URL(state.target).host}: nothing answered.`
+        : `Owly could not test ${new URL(state.target).host}: no page of it could be opened.`;
   state.elapsedMs += Date.now() - sliceStart;
   emit(state, "info", `Done: ${findings.length} issue${findings.length === 1 ? "" : "s"} found on ${okCount} page${okCount === 1 ? "" : "s"}`);
 
@@ -627,6 +647,7 @@ function finish(state: RunState, pages: Map<string, number | null>, sliceStart: 
     notes: [...new Set(state.notes)],
     events: state.events,
     journey: state.journey,
+    failed,
   });
   state.phase = "done";
   // The report carries everything a reader needs; the working set does not

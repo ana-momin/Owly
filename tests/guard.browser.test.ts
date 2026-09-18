@@ -74,9 +74,10 @@ describe("a link pointing off-origin, clicked anyway", () => {
     const page = await browser.newPage();
     await page.goto(target.href);
     await page.getByRole("link", { name: "Continue testing here" }).click();
-    await page.waitForTimeout(500);
+    // Waiting a fixed 500ms for a cross-origin request made this control flaky
+    // on a loaded machine, and a flaky control is worse than no control.
+    await expect.poll(() => exfilHits(), { timeout: 10_000 }).toBeGreaterThan(0);
     await page.close();
-    expect(exfilHits()).toBeGreaterThan(0);
   });
 
   it("is refused in Owly's session even when forced", async () => {
@@ -94,9 +95,8 @@ describe("a form that posts off-origin, submitted anyway", () => {
     const page = await browser.newPage();
     await page.goto(target.href);
     await page.getByRole("button", { name: "Ask" }).click();
-    await page.waitForTimeout(500);
+    await expect.poll(() => exfilHits(), { timeout: 10_000 }).toBeGreaterThan(0);
     await page.close();
-    expect(exfilHits()).toBeGreaterThan(0);
   });
 
   it("is refused in Owly's session even when forced", async () => {
