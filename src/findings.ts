@@ -17,6 +17,8 @@ export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type Confidence = "confirmed" | "likely" | "possible" | "inconclusive";
 
 export type FindingKind =
+  /** The site's main task could not be completed. The headline finding. */
+  | "task_blocked"
   | "js_exception"
   | "console_error"
   | "http_error"
@@ -37,6 +39,7 @@ export type FindingKind =
   | "slow_response";
 
 export const CATEGORY_OF: Record<FindingKind, Category> = {
+  task_blocked: "functional",
   js_exception: "functional",
   console_error: "functional",
   http_error: "functional",

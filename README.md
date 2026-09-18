@@ -1,8 +1,14 @@
 # Owly
 
-Owly opens your website in a real browser and uses it the way people do: as a
-new desktop user, as an impatient phone user, and with only a keyboard. It
-reports the problems it can reproduce, with the steps and the evidence.
+Owly opens your website in a real browser and tries to do what it is for:
+follow the main call to action, fill the form in, press the button. The report
+opens with the answer -
+
+> **A new visitor could not create an account.** Stopped at step 4 of 4:
+> pressing "Create account" - the server failed (HTTP 500).
+
+- with a screenshot of every step, and then the problems it hit on the way:
+as a new desktop user, as an impatient phone user, and with only a keyboard.
 
 **Live:** https://tryowly.vercel.app · **On Pond:** ask it to test your site.
 
@@ -16,6 +22,7 @@ recorded. The conversation you have with it is Pond's.
 
 | | |
 |---|---|
+| **The main journey** | whether a newcomer can finish the site's main task, which step stopped them, and why - with the screen at that moment |
 | **Forms** | submissions that fail on the server, submissions that produce no visible result at all, fields that accept an obviously invalid email |
 | **Errors** | uncaught JavaScript exceptions (with the line of source that threw), console errors, failed and slow requests |
 | **Links and images** | links that lead to error pages, images that do not load |
@@ -87,7 +94,7 @@ tools/          conformance.ts - drives a live deployment the way Pond does
 npm install
 npx playwright install chromium
 
-npm test          # 179 tests, including real-browser ones against the lab
+npm test          # 188 tests, including real-browser ones against the lab
 npm run bench     # score the engine against the lab
 npm run lab       # serve the lab apps to poke at by hand
 
@@ -108,7 +115,7 @@ Eight small apps, each on its own port so each is its own origin:
 The benchmark fails the build if the control app produces a finding or a safety
 rule is broken.
 
-Current score: **18/18** of the defects Owly is built to detect, **100%**
+Current score: **19/19** of the defects Owly is built to detect, **100%**
 precision, **0** false positives, **0** safety violations.
 
 ## Known and deliberate

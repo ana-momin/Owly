@@ -328,6 +328,24 @@ export class Session {
     return (await this.page.evaluate(script)) as T;
   }
 
+  /**
+   * A picture of what the user would be looking at, as a data URL.
+   *
+   * JPEG at a modest quality, and the viewport only - a full-page shot of a
+   * long marketing page is megabytes, and what matters is the screen at the
+   * moment something went wrong. Password fields are masked by the browser
+   * anyway (dots), and Owly only ever types synthetic data.
+   */
+  async shot(): Promise<string | null> {
+    try {
+      const buffer = await this.page.screenshot({ type: "jpeg", quality: 55, timeout: 8_000 });
+      if (buffer.byteLength > 400_000) return null;
+      return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+    } catch {
+      return null;
+    }
+  }
+
   async close(): Promise<void> {
     await this.context.close().catch(() => undefined);
   }

@@ -32,6 +32,7 @@ export const truth = truthFile as unknown as {
   defects: Defect[];
   safety: SafetyRule[];
   control: { app: string; rule: string };
+  journeys: Record<string, { expect: string; task?: string; reasonMatches?: string } | string>;
 };
 
 export interface Score {

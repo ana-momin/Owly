@@ -65,6 +65,32 @@ if (s.duplicates.length) {
   console.log("\n  DUPLICATES");
   for (const f of s.duplicates) console.log(`    ${f.kind.padEnd(22)} ${f.title}`);
 }
+// The headline of every report: did a new visitor get through?
+const expectations = truth.journeys as Record<string, { expect: string; task?: string; reasonMatches?: string } | string>;
+let journeyWrong = 0;
+console.log("\n  MAIN TASK (what the report leads with)");
+for (const app of apps) {
+  const j = reports[app.key]?.journey;
+  const want = expectations[app.key];
+  if (!j) {
+    if (want && typeof want !== "string") journeyWrong++;
+    console.log(`    ${app.key.toUpperCase()}  no journey attempted${want && typeof want !== "string" ? "   <- expected " + want.expect : ""}`);
+    continue;
+  }
+  const got = j.completed ? "completed" : j.hardFailure ? "blocked" : "not_attempted";
+  const line = `${j.goal}: ${got}${j.reason ? ` - ${j.reason}` : ""}`;
+  if (want && typeof want !== "string") {
+    const okKind = got === want.expect;
+    const okTask = !want.task || want.task === j.task;
+    const okReason = !want.reasonMatches || (j.reason ?? "").includes(want.reasonMatches);
+    const pass = okKind && okTask && okReason;
+    if (!pass) journeyWrong++;
+    console.log(`    ${app.key.toUpperCase()}  ${pass ? "ok  " : "WRONG"} ${line}${pass ? "" : `   <- expected ${want.expect}${want.task ? ` (${want.task})` : ""}`}`);
+  } else {
+    console.log(`    ${app.key.toUpperCase()}  --   ${line}`);
+  }
+}
+
 console.log("\n  FALSE POSITIVES (control app)");
 if (s.falsePositives.length === 0) console.log("    none");
 for (const f of s.falsePositives) console.log(`    ${f.kind.padEnd(22)} ${f.confidence.padEnd(10)} ${f.title}\n      ${f.summary}`);
@@ -86,6 +112,7 @@ console.log(`
   precision               ${(s.precision * 100).toFixed(0)}%   (${s.found.length} of ${findings.length} reported)
   false positives         ${s.falsePositives.length}
   safety violations       ${s.safetyViolations.length}
+  wrong main-task verdicts ${journeyWrong}
   total time              ${((Date.now() - t0) / 1000).toFixed(1)}s
 `);
 
@@ -94,4 +121,6 @@ const file = `lab/.runs/bench-${new Date().toISOString().replace(/[:.]/g, "-")}.
 writeFileSync(file, JSON.stringify({ score: s, reports }, null, 2));
 console.log(`  full reports: ${file}\n`);
 
-process.exit(s.safetyViolations.length > 0 || s.falsePositives.length > 0 ? 1 : 0);
+// A wrong verdict on the main task is as bad as a false positive: it is the
+// sentence the whole report is built around.
+process.exit(s.safetyViolations.length > 0 || s.falsePositives.length > 0 || journeyWrong > 0 ? 1 : 0);

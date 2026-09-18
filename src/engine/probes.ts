@@ -232,9 +232,21 @@ export async function loadUnit(
   // whatever it was showing before. Analysing that would describe a page the
   // site never served: it once produced "dead end: no links, buttons or
   // forms" for a redirect that works perfectly.
+  // "Left the site" means the browser ENDED UP somewhere else - not merely that
+  // the page tried. A page that redirects itself off-site is refused with a 204
+  // and stays put, and that page is still worth testing: treating the attempt
+  // as leaving cost the injection-trap app every page but its first.
   const refused = s.since(mark).blocked.find((b) => !sameOrigin(b.url, s.opts.target));
-  if (refused || !sameOrigin(finalUrl || url, s.opts.target)) {
-    result.leftTheSite = refused?.url ?? finalUrl;
+  const landedOnRequest = (() => {
+    try {
+      return new URL(finalUrl).href.replace(/\/$/, "") === new URL(url).href.replace(/\/$/, "");
+    } catch {
+      return false;
+    }
+  })();
+  const landedOffSite = !finalUrl || !sameOrigin(finalUrl, s.opts.target);
+  if (landedOffSite || (refused && !landedOnRequest)) {
+    result.leftTheSite = (landedOffSite ? finalUrl : refused?.url) || refused?.url || finalUrl;
     result.notes.push(`${path(url)} leads off the site (to ${new URL(result.leftTheSite).origin}), so Owly stopped there.`);
     return result;
   }

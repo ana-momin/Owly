@@ -20,13 +20,14 @@
 
 import type { Browser } from "playwright-core";
 import { load } from "../config.js";
-import type { Finding } from "../findings.js";
+import type { Evidence, Finding } from "../findings.js";
 import { createRedactor } from "../policy/redact.js";
 import { checkUrl, sameOrigin } from "../policy/urlGuard.js";
 import { launchBrowser, PERSONAS, Session, type BlockRecord, type Persona } from "../browser/session.js";
 import { parseUnit, unitKey, type Activity, type Candidate } from "./candidate.js";
 import { cluster, replayKey } from "./cluster.js";
 import { a11yUnit, buttonsUnit, formsUnit, keyboardUnit, layoutUnit, loadUnit, type UnitResult } from "./probes.js";
+import { runJourney, type Journey } from "./journey.js";
 
 /**
  * `full` presses buttons and submits forms. `passive` only looks: it loads
@@ -45,6 +46,7 @@ export interface RunEvent {
 }
 
 type WorkItem = (
+  | { kind: "journey" }
   | { kind: "discover"; url: string; from: string | null; via: string }
   | { kind: "unit"; persona: Persona["key"]; activity: Activity; url: string }
   | { kind: "replay"; unit: string }
@@ -61,6 +63,7 @@ type WorkItem = (
 export const ITEM_LIMIT_MS = 35_000;
 
 const ACTIVITY_LABEL: Record<Activity, string> = {
+  journey: "the main user journey",
   load: "loading the page",
   links: "checking links",
   a11y: "the accessibility scan",
@@ -99,6 +102,8 @@ export interface RunReport {
   pages: Array<{ url: string; status: number | null }>;
   notes: string[];
   events: RunEvent[];
+  /** The attempt at the site's main task. The report leads with it. */
+  journey: Journey | null;
 }
 
 export interface RunState {
@@ -120,6 +125,7 @@ export interface RunState {
   events: RunEvent[];
   activities: Activity[];
   exploringStopped: boolean;
+  journey: Journey | null;
   createdAt: string;
   elapsedMs: number;
   slices: number;
@@ -131,13 +137,13 @@ export function activitiesFor(mode: Mode, focus: Focus): Activity[] {
   const interactive: Activity[] = mode === "full" ? ["buttons", "forms"] : [];
   switch (focus) {
     case "forms":
-      return ["load", "links", ...interactive];
+      return ["journey", "load", "links", ...interactive];
     case "mobile":
       return ["load", "links", "layout"];
     case "accessibility":
       return ["load", "links", "a11y", "keyboard"];
     default:
-      return ["load", "links", "a11y", "layout", ...interactive, "keyboard"];
+      return ["journey", "load", "links", "a11y", "layout", ...interactive, "keyboard"];
   }
 }
 
@@ -173,7 +179,9 @@ export async function newRun(targetUrl: string, opts: NewRunOptions): Promise<Ru
     maxPages: opts.maxPages ?? config.budgets.maxPages,
     maxRunMs: opts.maxRunMs ?? config.budgets.maxRunMs,
     phase: "discover",
-    pending: [{ kind: "discover", url: target, from: null, via: "start" }],
+    pending: activitiesFor(opts.mode, focus).includes("journey")
+      ? [{ kind: "journey" }, { kind: "discover", url: target, from: null, via: "start" }]
+      : [{ kind: "discover", url: target, from: null, via: "start" }],
     pages: [],
     referrers: [],
     candidates: [],
@@ -183,6 +191,7 @@ export async function newRun(targetUrl: string, opts: NewRunOptions): Promise<Ru
     events: [],
     activities: activitiesFor(opts.mode, focus),
     exploringStopped: false,
+    journey: null,
     createdAt: new Date().toISOString(),
     elapsedMs: 0,
     slices: 0,
@@ -332,6 +341,21 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
       // A hung page cannot take the slice past the function's time limit, and
       // a late finisher cannot write into a run that has already been saved.
 
+      if (item.kind === "journey") {
+        emit(state, "info", "Trying the site the way a new visitor would");
+        const outcome = await attempt(async () => runJourney(await shared("new_user"), state.target, state.mode === "full"));
+        if (!outcome.ok) {
+          retryOrSkip(item, "the main user journey", outcome);
+          if (outcome.stopSlice) break;
+          continue;
+        }
+        if (outcome.value) {
+          state.journey = outcome.value;
+          applyJourney(state, outcome.value);
+        }
+        continue;
+      }
+
       if (item.kind === "discover") {
         let url: string;
         try {
@@ -417,6 +441,13 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
       const outcome = await attempt(async () => {
         const fresh = await Session.open(await getBrowser(), sessionOpts(PERSONAS[persona]));
         try {
+          if (activity === "journey") {
+            const again = await runJourney(fresh, state.target, state.mode === "full");
+            return {
+              keys: again?.hardFailure && !again.completed ? [replayKey({ unit: item.unit, fingerprint: `task_blocked|${again.task}` })] : [],
+              blocked: fresh.blocked,
+            };
+          }
           if (activity === "links") {
             const status = await fresh.goto(url);
             return {
@@ -478,6 +509,58 @@ async function runUnit(s: Session, activity: Activity, url: string, mode: Mode):
   }
 }
 
+/**
+ * A journey that did not complete is the most important thing a report can
+ * say, so it becomes a finding like any other - verified by replay before it
+ * is reported, with the screen at the moment it stopped as evidence.
+ *
+ * A journey Owly merely looked at (a passive scan) produces no finding: not
+ * having tried is not the same as having failed.
+ */
+function applyJourney(state: RunState, journey: Journey): void {
+  const where = journey.steps.filter((s) => !s.ok)[0] ?? journey.steps.at(-1);
+  emit(
+    state,
+    journey.completed ? "confirmed" : journey.lookedOnly ? "info" : "suspect",
+    journey.completed
+      ? `A new visitor could ${journey.goal.toLowerCase()} in ${journey.steps.length} steps`
+      : journey.lookedOnly
+        ? `Found the way in ("${journey.entry ?? "none"}"), but a passive scan does not press it`
+        : `A new visitor could not ${journey.goal.toLowerCase()}: ${journey.reason ?? "unknown"}`,
+  );
+  // Reported only when the site did something demonstrably wrong. Owly
+  // stopping (a guarded button, a passive scan) is its own decision, and Owly
+  // running out of road usually means it did not understand this product -
+  // neither is evidence of a defect.
+  if (!journey.hardFailure || journey.completed || journey.lookedOnly || journey.stoppedByOwly || !journey.reason) return;
+
+  const shots = journey.steps
+    .filter((s) => s.shot)
+    .slice(-2)
+    .map((s): Evidence => ({ type: "screenshot", ref: s.shot!, caption: `Step ${s.n}: ${s.action} - ${s.outcome}` }));
+
+  state.candidates.push({
+    kind: "task_blocked",
+    title: `A new visitor cannot ${journey.goal.toLowerCase()}`,
+    severity: "critical",
+    url: where?.url ?? state.target,
+    ...(journey.entry ? { target: journey.entry } : {}),
+    persona: "new_user",
+    summary: journey.reason,
+    expected: `Someone arriving at the site can ${journey.goal.toLowerCase()} by following the most prominent call to action.`,
+    actual: where ? `${where.action} - ${where.outcome}` : journey.reason,
+    steps: journey.steps.map((s) => `${s.action} - ${s.outcome}`),
+    evidence: [...(where?.evidence ?? []), ...shots],
+    observed: journey.observed,
+    inference: [
+      "Owly picked this task from the most prominent call to action on the home page; it does not know the product, so the task it chose may not be the one that matters most to you.",
+    ],
+    deterministic: false,
+    fingerprint: `task_blocked|${journey.task}`,
+    unit: unitKey("new_user", "journey", state.target),
+  });
+}
+
 function addBrokenLinks(
   state: RunState,
   pages: Map<string, number | null>,
@@ -536,6 +619,7 @@ function finish(state: RunState, pages: Map<string, number | null>, sliceStart: 
     pages: [...pages].map(([url, status]) => ({ url, status })),
     notes: [...new Set(state.notes)],
     events: state.events,
+    journey: state.journey,
   });
   state.phase = "done";
   // The report carries everything a reader needs; the working set does not

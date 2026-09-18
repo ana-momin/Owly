@@ -70,11 +70,39 @@ export function pondMarkdown(report: RunReport, reportUrl: string | null, limit 
   const ok = report.pages.filter((p) => p.status !== null && p.status < 400).length;
   const lines: string[] = [];
   lines.push(`## Owly report: ${host(report.target)}`);
+
+  // The verdict first. It is the one line a founder actually wants, and a list
+  // of console errors is not it.
+  const j = report.journey;
+  if (j) {
+    // Only an evidenced failure says "could not". Owly running out of road -
+    // no call to action it recognises - is not the site's fault, and phrasing
+    // it as one told Owly's own site it was broken when it simply has no
+    // signup form.
+    const blocked = j.hardFailure && !j.completed;
+    const failing = j.steps.filter((s) => !s.ok)[0];
+    lines.push("");
+    if (j.completed) {
+      lines.push(`### A new visitor could ${j.goal.toLowerCase()}`);
+      lines.push(`Followed "${j.entry}" and finished in ${j.steps.length} steps.`);
+    } else if (blocked) {
+      lines.push(`### A new visitor could not ${j.goal.toLowerCase()}`);
+      lines.push(
+        failing
+          ? `Stopped at step ${failing.n} of ${j.steps.length}: ${failing.action} — ${failing.outcome}.`
+          : (j.reason ?? ""),
+      );
+    } else {
+      lines.push(`### The main task was not attempted`);
+      lines.push(j.reason ?? "");
+    }
+  }
+
   lines.push("");
   lines.push(
     `${report.mode === "full" ? "Full test" : "Passive scan"} · focus: ${FOCUS_LABEL[report.focus]} · ${ok} page${ok === 1 ? "" : "s"} · ${counts(report.findings)} · ${duration(report.durationMs)}`,
   );
-  if (reportUrl) lines.push("", `**[Open the full report with evidence](${reportUrl})**`);
+  if (reportUrl) lines.push("", `**[Open the full report with screenshots and evidence](${reportUrl})**`);
 
   if (report.findings.length === 0) {
     lines.push("", "No problems reproduced. Every suspected issue was checked again in a fresh browser before it could be reported.");
