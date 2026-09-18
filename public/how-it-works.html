@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>How Owly works</title>
-<meta name="description" content="Four phases, one rule: nothing is reported unless it happened twice. What Owly does during a test, how to verify your site, and what it deliberately will not do.">
+<meta name="description" content="Four phases, one rule: nothing is reported unless it happened twice. What Owly does on a run, how to verify your site, and what it will not do.">
 <link rel="icon" href="/icon-32.png" sizes="32x32">
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="/icon-180.png">
-<meta name="theme-color" content="#0d0c1a">
+<meta name="theme-color" content="#f7f1e4">
 <meta property="og:type" content="website">
 <meta property="og:title" content="How Owly works">
 <meta property="og:description" content="Four phases, one rule: nothing is reported unless it happened twice.">
@@ -16,84 +16,83 @@
 <meta name="twitter:card" content="summary">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 </head>
 <body>
 
 <header class="site">
   <div class="w">
-    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
+    <a class="brand" href="/"><img src="/icon-64.png" alt="" width="38" height="38" decoding="async"> Owly</a>
     <nav class="main">
-      <a href="/how-it-works" aria-current="page">how it works</a>
-      <a href="/pricing">pricing</a>
-      <a href="/demo-report">a real report</a>
+      <a href="/how-it-works" aria-current="page">How it works</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/demo-report">A real report</a>
     </nav>
-    <a class="btn lav" href="https://joinpond.ai" rel="noopener">Start on Pond</a>
+    <a class="btn go" href="https://joinpond.ai" rel="noopener">Wake Owly up</a>
   </div>
 </header>
 <div class="mobile-nav">
-  <a href="/how-it-works" aria-current="page">how it works</a>
-  <a href="/pricing">pricing</a>
-  <a href="/demo-report">a real report</a>
-  <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
+  <a href="/how-it-works" aria-current="page">How it works</a>
+  <a href="/pricing">Pricing</a>
+  <a href="/demo-report">A real report</a>
+  <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
 </div>
 
 <main>
 
 <div class="hero">
-  <span class="glow a"></span><span class="glow b"></span>
-  <div class="w narrow">
-    <span class="kicker">How it works</span>
-    <h1 class="big">One rule: it has to <em class="it">happen twice</em>.</h1>
+  <div class="sky" aria-hidden="true">
+    <span class="moon"></span>
+    <span class="star" style="top:140px;left:10%"></span>
+    <span class="star" style="top:230px;left:30%;width:9px;height:9px"></span>
+    <span class="star" style="top:96px;left:52%;width:10px;height:10px"></span>
+  </div>
+  <img class="peek" src="/icon-192.png" alt="" width="132" height="132" decoding="async">
+  <div class="w">
+    <div class="lead">
+    <span class="tape">How it works</span>
+    <h1 class="big" style="margin-top:24px">One rule: it has to happen twice.</h1>
     <p class="lede">A bug report you cannot trust costs more time than the bug. So Owly proves everything it says before it says it.</p>
+    </div>
   </div>
 </div>
 
-<section class="day">
+<section class="shift">
   <div class="w">
     <div class="rise">
-      <span class="kicker">One run</span>
-      <h2 class="big">Four phases, about <em class="it">ninety seconds</em>.</h2>
+      <span class="tape">One run</span>
+      <h2 class="big" style="margin-top:22px">Four phases, ninety seconds.</h2>
     </div>
-    <div class="steps rise">
-      <div class="stepline">
-        <div class="num">01</div>
-        <div>
-          <h3>Discover</h3>
-          <p>Owly opens your site as a new desktop visitor, follows the most prominent call to action, and runs its checks on every page it reaches.</p>
-        </div>
+    <div class="clocks rise">
+      <div class="clock">
+        <p class="time">PHASE 1</p>
+        <h3>Discover</h3>
+        <p>Opens your site as a new desktop visitor, follows the most prominent call to action, and checks every page it reaches.</p>
       </div>
-      <div class="stepline">
-        <div class="num">02</div>
-        <div>
-          <h3>Personas</h3>
-          <p>The same pages twice more: as an impatient phone user on a 390px screen, and as someone using only a keyboard.</p>
-        </div>
+      <div class="clock">
+        <p class="time">PHASE 2</p>
+        <h3>Personas</h3>
+        <p>The same pages twice more: as an impatient phone user at 390px, and as someone with only a keyboard.</p>
       </div>
-      <div class="stepline">
-        <div class="num">03</div>
-        <div>
-          <h3>Verify</h3>
-          <p>Every suspected problem is replayed in a fresh browser. Anything that does not happen again is held back and listed as unverified, not as a bug.</p>
-        </div>
+      <div class="clock">
+        <p class="time">PHASE 3</p>
+        <h3>Verify</h3>
+        <p>Every suspected problem is replayed in a fresh browser. No repeat, no report: it is listed as unverified instead.</p>
       </div>
-      <div class="stepline">
-        <div class="num">04</div>
-        <div>
-          <h3>Report</h3>
-          <p>Duplicates are clustered, secrets are redacted, and you get a page that opens with the answer and backs it with screenshots.</p>
-        </div>
+      <div class="clock">
+        <p class="time">PHASE 4</p>
+        <h3>Write it up</h3>
+        <p>Duplicates clustered, secrets redacted, and a page that opens with the answer and backs it with screenshots.</p>
       </div>
     </div>
   </div>
 </section>
 
 <section>
-  <span class="glow c"></span>
   <div class="w narrow prose">
-    <span class="kicker">Verification</span>
-    <h2 class="big" style="margin-bottom:26px">Proving the site is <em class="it">yours</em>.</h2>
+    <span class="tape">Verification</span>
+    <h2 class="big" style="margin:22px 0 18px">Proving the site is yours.</h2>
     <p>Any site can be looked at. To let Owly type into forms and press buttons, publish a token it derives from your hostname. Any one of these works:</p>
 <pre class="code">/.well-known/owly-verification.txt      contains the token
 
@@ -102,11 +101,8 @@
 DNS TXT   owly-verification=owly-...</pre>
     <p>Ask Owly for your token on Pond. Until it is there, a test is a passive scan: it looks at pages, layout and accessibility, and presses nothing.</p>
 
-    <h2>What it will not do</h2>
-    <p>Press anything that looks like paying, deleting, sending, inviting or publishing. Follow your site off its own origin, including a redirect the page performs itself. Reach a private or internal address, whatever the hostname resolves to. Put anything but obvious synthetic data into a field.</p>
-
     <h2>What it cannot find</h2>
-    <p>Anything that needs judgement: a confusing label, an unhelpful error message, a total that is wrong but renders perfectly. Owly is honest about this rather than pretending &mdash; its own benchmark counts those as misses.</p>
+    <p>Anything that needs judgement: a confusing label, an unhelpful error message, a total that is wrong but renders perfectly. Owly says so rather than guessing &mdash; its own benchmark counts those as misses.</p>
 
     <h2>How good is it, actually</h2>
     <p>Owly is scored against a lab of deliberately broken apps plus one control app with nothing wrong at all. Current score: <strong>19 of 19</strong> of the defects it is built to detect, <strong>100% precision</strong>, <strong>zero</strong> false positives on the control, <strong>zero</strong> safety-rule violations. The build fails if any of those slip.</p>
@@ -116,15 +112,14 @@ DNS TXT   owly-verification=owly-...</pre>
   </div>
 </section>
 
-<section class="closer">
-  <span class="glow b"></span>
+<section class="closer" style="padding-top:0">
   <div class="w narrow rise">
-    <img class="owl" src="/icon-192.png" alt="" width="92" height="92" decoding="async">
+    <img class="owl" src="/icon-192.png" alt="" width="110" height="110" decoding="async">
     <h2>See it on a real site.</h2>
     <p>A full report of a small site whose signup fails on purpose &mdash; screenshots and all.</p>
     <div class="cta-row">
-      <a class="btn lav lg" href="/demo-report">Read the report</a>
-      <a class="btn outline lg" href="/pricing">Pricing</a>
+      <a class="btn go lg" href="/demo-report">Read the report</a>
+      <a class="btn lg" href="/pricing">Pricing</a>
     </div>
   </div>
 </section>
@@ -134,16 +129,16 @@ DNS TXT   owly-verification=owly-...</pre>
 <footer class="site">
   <div class="w">
     <div class="cols">
-      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="32" height="32" decoding="async"> Owly</a>
+      <a class="brand" href="/"><img src="/icon-64.png" alt="" width="38" height="38" decoding="async"> Owly</a>
       <div class="links">
-        <a href="/how-it-works">how it works</a>
-        <a href="/pricing">pricing</a>
-        <a href="/demo-report">a real report</a>
-        <a href="https://github.com/ana-momin/Owly" rel="noopener">source</a>
-        <a href="https://joinpond.ai" rel="noopener">pond</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/demo-report">A real report</a>
+        <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
+        <a href="https://joinpond.ai" rel="noopener">Pond</a>
       </div>
     </div>
-    <p class="fine">Owly is rule-based checks and scripted user behaviour in a real browser. It does not guess, and nothing reaches a report unless the browser recorded it twice.</p>
+    <p class="fine">Owly runs rule-based checks and scripted user behaviour in a real browser. It does not guess, and nothing reaches a report unless the browser recorded it twice.</p>
   </div>
 </footer>
 
