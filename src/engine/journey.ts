@@ -148,7 +148,34 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
   // --- 1. the front door --------------------------------------------------
   let at = Date.now();
   const status = await s.goto(startUrl);
-  if (status === null || status >= 400) return null;
+  if (status === null || status >= 400) {
+    // Returning null here meant the report simply had no verdict on it: a run
+    // that opened four pages and said nothing about the main task, with no
+    // note explaining why. Say what happened instead. A page that answers 4xx
+    // or 5xx is the site failing; a navigation that answers nothing at all may
+    // be Owly's own cold browser, so that one is not held against the site.
+    observed.push(
+      status === null
+        ? `The home page did not respond${s.lastNavigationError ? ` (${s.lastNavigationError})` : ""}.`
+        : `The home page answered HTTP ${status}.`,
+    );
+    return {
+      task: "signup",
+      goal: "Start using the site",
+      entry: null,
+      steps,
+      completed: false,
+      reason:
+        status === null
+          ? "Owly could not open the home page, so it never got to try the main task."
+          : `The home page answered HTTP ${status}, so there was nothing to start from.`,
+      observed,
+      durationMs: Date.now() - started,
+      lookedOnly: !interactive,
+      stoppedByOwly: false,
+      hardFailure: status !== null,
+    };
+  }
   await step(`Open ${startUrl}`, `The page loaded${status === 200 ? "" : ` (HTTP ${status})`}`, true, at);
 
   // --- 2. what is this site asking a newcomer to do? ----------------------

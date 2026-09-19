@@ -120,3 +120,28 @@ describe("the blocked journey becomes the report's headline", () => {
     expect(first.confidence).toBe("confirmed");
   }, 300_000);
 });
+
+/**
+ * A journey that cannot start must still say something.
+ *
+ * Returning null here once produced a live report with four pages tested, no
+ * verdict at all and no note explaining the silence - the reader had no way
+ * to tell "your main task is fine" from "Owly never tried it".
+ */
+describe("when the front door will not open", () => {
+  it("says the home page did not respond, and does not blame the site", async () => {
+    const target = new URL("http://127.0.0.1:9/");
+    const session = await Session.open(browser, { target, persona: PERSONAS.new_user, allowPrivate: true, userAgentSuffix: "OwlyQA/test" });
+    try {
+      const j = await runJourney(session, target.href, true);
+      expect(j).not.toBeNull();
+      expect(j!.completed).toBe(false);
+      expect(j!.reason).toMatch(/could not open the home page/i);
+      // Nothing answered, so this may be Owly's own browser: not a finding.
+      expect(j!.hardFailure).toBe(false);
+      expect(j!.observed.join(" ")).toMatch(/did not respond/i);
+    } finally {
+      await session.close();
+    }
+  }, 120_000);
+});

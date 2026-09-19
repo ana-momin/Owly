@@ -321,7 +321,8 @@ export class Session {
     // did not answer - when it was up the whole time. One retry tells "the site
     // is down" apart from "the browser was not ready yet".
     let response = null;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const backoff = [400, 1_200];
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         response = await this.page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
         this.lastNavigationError = null;
@@ -330,7 +331,8 @@ export class Session {
         response = null;
       }
       if (response) break;
-      if (attempt === 0) await this.page.waitForTimeout(700).catch(() => undefined);
+      const wait = backoff[attempt];
+      if (wait) await this.page.waitForTimeout(wait).catch(() => undefined);
     }
     this.lastContentType = response?.headers()["content-type"] ?? null;
     await this.settle(patienceMs);

@@ -81,3 +81,34 @@ describe("only the endpoints that drive a browser carry one", () => {
     }
   });
 });
+
+/**
+ * The engine function needs more than the defaults, and it is easy to lose.
+ *
+ * When the two heavy routes were merged into one top-level api/engine.ts, the
+ * config key `api/**` + `/*.ts` stopped matching it - that glob needs at least
+ * one directory - so the function quietly ran with default memory, the
+ * default time limit and no axe-core. The first real test after that died
+ * with "Target page, context or browser has been closed".
+ */
+describe("the engine function keeps what it needs", () => {
+  const config = JSON.parse(readFileSync("vercel.json", "utf8"));
+
+  it("is configured under its own exact path", () => {
+    expect(Object.keys(config.functions)).toContain("api/engine.ts");
+  });
+
+  it("gets the memory, the time and the accessibility engine", () => {
+    const f = config.functions["api/engine.ts"];
+    expect(f.memory).toBeGreaterThanOrEqual(2048);
+    expect(f.maxDuration).toBeGreaterThanOrEqual(120);
+    expect(f.includeFiles).toMatch(/axe-core/);
+  });
+
+  it("names a file that exists and is the one with the engine", () => {
+    for (const path of Object.keys(config.functions)) {
+      expect(existsSync(path), `${path} is configured but missing`).toBe(true);
+    }
+    expect(readFileSync("api/engine.ts", "utf8")).toMatch(/production-full\.js/);
+  });
+});
