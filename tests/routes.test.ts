@@ -20,6 +20,7 @@ const ROUTES: Array<[method: string, path: string, file: string]> = [
   ["GET", "/api/tasks/:id", "api/tasks/[id].ts"],
   ["GET", "/api/r/:id", "api/r/[id]/index.ts"],
   ["POST", "/api/r/:id/advance", "api/r/[id]/advance.ts"],
+  ["POST", "/api/try", "api/try.ts"],
 ];
 
 describe("each path has a Vercel function file", () => {

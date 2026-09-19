@@ -315,11 +315,30 @@ export class Session {
    * unit is the one that waits, because timing that call is its job.
    */
   async goto(url: string, patienceMs = this.opts.persona.patienceMs, timeoutMs = 20_000): Promise<number | null> {
-    const response = await this.page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs }).catch(() => null);
+    // A serverless browser can lose its very first navigation: the instance is
+    // cold, nothing is warm, and the page comes back with nothing at all. That
+    // produced a live run that tested 0 pages and told the owner their site
+    // did not answer - when it was up the whole time. One retry tells "the site
+    // is down" apart from "the browser was not ready yet".
+    let response = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await this.page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+        this.lastNavigationError = null;
+      } catch (err) {
+        this.lastNavigationError = (err instanceof Error ? err.message : String(err)).split(/\r?\n/)[0]!.trim();
+        response = null;
+      }
+      if (response) break;
+      if (attempt === 0) await this.page.waitForTimeout(700).catch(() => undefined);
+    }
     this.lastContentType = response?.headers()["content-type"] ?? null;
     await this.settle(patienceMs);
     return response?.status() ?? null;
   }
+
+  /** Why the last navigation produced nothing, when it produced nothing. */
+  lastNavigationError: string | null = null;
 
   /** Content type of the last document navigation, for deciding if it is a page at all. */
   lastContentType: string | null = null;

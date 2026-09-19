@@ -252,8 +252,9 @@ export async function loadUnit(
   // A test that could not load the site has to say so.
   const blank = !finalUrl || finalUrl === "about:blank" || finalUrl === "chrome-error://chromewebdata/";
   if (status === null && blank) {
-    result.unreachable = `${path(url)} did not respond.`;
-    result.notes.push(`${path(url)} did not respond, so there was nothing to test.`);
+    const why = s.lastNavigationError ? ` (${s.lastNavigationError})` : "";
+    result.unreachable = `${path(url)} did not respond${why}.`;
+    result.notes.push(`${path(url)} did not respond${why}, so there was nothing to test.`);
     return result;
   }
 

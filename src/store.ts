@@ -41,6 +41,12 @@ export interface Store {
   saveRun(id: string, patch: { status: RunStatus; state: RunState; error?: string | null; attempts?: number }): Promise<void>;
   recall(key: string): Promise<Replay | null>;
   remember(key: string, replay: Replay): Promise<void>;
+  /**
+   * Add one to a named counter and return the new value. The replay cache
+   * cannot do this - it is write-once by design - and the free try-it limits
+   * need a count that actually goes up, atomically, across instances.
+   */
+  bump(key: string): Promise<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +54,7 @@ export interface Store {
 export class MemoryStore implements Store {
   private runs = new Map<string, StoredRun & { leaseUntil: number }>();
   private replays = new Map<string, Replay>();
+  private counters = new Map<string, number>();
 
   async createRun(run: { id: string; pondRunId: string | null; state: RunState }): Promise<void> {
     const now = new Date().toISOString();
@@ -98,6 +105,12 @@ export class MemoryStore implements Store {
     if (!this.replays.has(key)) this.replays.set(key, JSON.parse(JSON.stringify(replay)));
   }
 
+  async bump(key: string): Promise<number> {
+    const next = (this.counters.get(key) ?? 0) + 1;
+    this.counters.set(key, next);
+    return next;
+  }
+
   private copy(r: StoredRun): StoredRun {
     const { leaseUntil: _ignored, ...rest } = r as StoredRun & { leaseUntil: number };
     return JSON.parse(JSON.stringify(rest));
@@ -134,6 +147,11 @@ export async function neonStore(databaseUrl: string): Promise<Store> {
         status_code integer NOT NULL,
         payload jsonb NOT NULL,
         created_at timestamptz NOT NULL DEFAULT now()
+      )`;
+      await sql`CREATE TABLE IF NOT EXISTS owly_counters (
+        key text PRIMARY KEY,
+        n integer NOT NULL DEFAULT 0,
+        updated_at timestamptz NOT NULL DEFAULT now()
       )`;
     })().catch((err) => {
       ready = null;
@@ -220,6 +238,16 @@ export async function neonStore(databaseUrl: string): Promise<Store> {
       await sql`INSERT INTO owly_idempotency (key, status_code, payload)
                 VALUES (${key}, ${replay.statusCode}, ${JSON.stringify(replay.payload)}::jsonb)
                 ON CONFLICT (key) DO NOTHING`;
+    },
+
+    async bump(key) {
+      await ensure();
+      // One statement, so two visitors arriving at once cannot both read the
+      // same number and both be let through.
+      const rows = (await sql`INSERT INTO owly_counters (key, n) VALUES (${key}, 1)
+                ON CONFLICT (key) DO UPDATE SET n = owly_counters.n + 1, updated_at = now()
+                RETURNING n`) as Array<{ n: number }>;
+      return Number(rows[0]?.n ?? 1);
     },
   };
 }

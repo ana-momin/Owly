@@ -65,6 +65,37 @@ export function counts(findings: Finding[]): string {
   return `${findings.length} issue${findings.length === 1 ? "" : "s"} (${parts.join(", ")})`;
 }
 
+/**
+ * The answer in two sentences: what happened, and where. Used by the Pond
+ * summary and by the try-it chat on the site, so they cannot drift apart.
+ */
+export function verdict(report: RunReport): { headline: string; detail: string } {
+  if (report.failed) {
+    return {
+      headline: report.failed,
+      detail: "Nothing was tested, so this is not a clean bill of health. Check the address, whether the site is up, and whether it is reachable from the public internet.",
+    };
+  }
+  const j = report.journey;
+  if (!j) return { headline: `${host(report.target)}: ${counts(report.findings)}`, detail: "" };
+  const failing = j.steps.filter((s) => !s.ok)[0];
+  if (j.completed) {
+    return {
+      headline: `A new visitor could ${j.goal.toLowerCase()}`,
+      detail: `Followed "${j.entry}" and finished in ${j.steps.length} steps.`,
+    };
+  }
+  // Only an evidenced failure says "could not". Owly running out of road is
+  // not the site being broken.
+  if (j.hardFailure) {
+    return {
+      headline: `A new visitor could not ${j.goal.toLowerCase()}`,
+      detail: failing ? `Stopped at step ${failing.n} of ${j.steps.length}: ${failing.action} — ${failing.outcome}.` : (j.reason ?? ""),
+    };
+  }
+  return { headline: "The main task was not attempted", detail: j.reason ?? "" };
+}
+
 /** The report as Pond shows it in chat. Short, with the evidence one link away. */
 export function pondMarkdown(report: RunReport, reportUrl: string | null, limit = 8): string {
   const ok = report.pages.filter((p) => p.status !== null && p.status < 400).length;
@@ -83,29 +114,9 @@ export function pondMarkdown(report: RunReport, reportUrl: string | null, limit 
 
   // The verdict first. It is the one line a founder actually wants, and a list
   // of console errors is not it.
-  const j = report.journey;
-  if (j) {
-    // Only an evidenced failure says "could not". Owly running out of road -
-    // no call to action it recognises - is not the site's fault, and phrasing
-    // it as one told Owly's own site it was broken when it simply has no
-    // signup form.
-    const blocked = j.hardFailure && !j.completed;
-    const failing = j.steps.filter((s) => !s.ok)[0];
-    lines.push("");
-    if (j.completed) {
-      lines.push(`### A new visitor could ${j.goal.toLowerCase()}`);
-      lines.push(`Followed "${j.entry}" and finished in ${j.steps.length} steps.`);
-    } else if (blocked) {
-      lines.push(`### A new visitor could not ${j.goal.toLowerCase()}`);
-      lines.push(
-        failing
-          ? `Stopped at step ${failing.n} of ${j.steps.length}: ${failing.action} — ${failing.outcome}.`
-          : (j.reason ?? ""),
-      );
-    } else {
-      lines.push(`### The main task was not attempted`);
-      lines.push(j.reason ?? "");
-    }
+  if (report.journey) {
+    const v = verdict(report);
+    lines.push("", `### ${v.headline}`, v.detail);
   }
 
   lines.push("");

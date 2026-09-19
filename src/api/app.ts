@@ -18,7 +18,7 @@ import { advance, newRun, type Focus, type RunState } from "../engine/machine.js
 import type { OwnershipResult } from "../policy/ownership.js";
 import { checkUrl } from "../policy/urlGuard.js";
 import { failedPage, notFoundPage, progressPage, reportPage, contentSecurityPolicy } from "../report/html.js";
-import { pondMarkdown } from "../report/text.js";
+import { counts, pondMarkdown, verdict } from "../report/text.js";
 import type { Store, StoredRun } from "../store.js";
 import { ACTIONS, AGENT_VERSION, manifest, MAX_REQUEST_BYTES, PROTOCOL_VERSION } from "./manifest.js";
 import { Invalid, validate } from "./params.js";
@@ -38,6 +38,10 @@ export interface AppDeps {
 }
 
 type Json = Record<string, unknown>;
+
+/** What the free try-it page allows: per visitor a day, and for everyone a day. */
+const TRY_PER_VISITOR = 3;
+const TRY_PER_DAY = 30;
 
 function perr(c: Context, code: string, message: string, status: number, runId?: string, details?: Json) {
   const body: Json = { error: { code, message, ...(details ? { details } : {}) } };
@@ -254,6 +258,52 @@ export function createApp(deps: AppDeps): Hono {
     });
   });
 
+  /**
+   * The try-it chat on the site. Public on purpose: no key, no account, and
+   * therefore capped - a few tests per visitor a day and a ceiling for the
+   * whole day, because every run costs browser time on a free plan.
+   *
+   * It runs a PASSIVE scan unless the site has published the ownership token,
+   * so a stranger can point it at any address without Owly typing into
+   * someone elses forms.
+   */
+  app.post("/try", async (c) => {
+    let body: Json;
+    try {
+      body = (await c.req.json()) as Json;
+    } catch {
+      return perr(c, "invalid_input", "Send a JSON body with a url.", 400);
+    }
+    const raw = typeof body.url === "string" ? body.url : "";
+    if (!raw.trim()) return perr(c, "invalid_input", "Which site should Owly look at?", 422, undefined, { field: "url" });
+    if (raw.length > 2000) return perr(c, "invalid_input", "That address is too long.", 422, undefined, { field: "url" });
+
+    const site = normaliseSite(raw);
+    const verdictUrl = await checkUrl(site, { allowPrivate: deps.allowPrivate });
+    if (!verdictUrl.ok) {
+      return perr(c, "invalid_input", `Owly cannot test that: ${verdictUrl.reason}.`, 422, undefined, { field: "url" });
+    }
+
+    const day = new Date().toISOString().slice(0, 10);
+    const who = (c.req.header("x-forwarded-for") ?? "").split(",")[0]!.trim() || "unknown";
+    const mine = await deps.store.bump(`try:${day}:${who}`);
+    if (mine > TRY_PER_VISITOR) {
+      return perr(c, "rate_limited", `That is ${TRY_PER_VISITOR} tests today from here. Owly is free and runs on a small budget - come back tomorrow, or use it on Pond.`, 429);
+    }
+    const all = await deps.store.bump(`try:${day}:all`);
+    if (all > TRY_PER_DAY) {
+      return perr(c, "rate_limited", "Owly has used up today’s free tests for everyone. Try again tomorrow, or use it on Pond.", 429);
+    }
+
+    const ownership = await deps.checkOwnership(site).catch(() => null);
+    const mode = ownership?.verified ? "full" : "passive";
+    const state = await newRun(site, { mode, focus: "everything", allowPrivate: deps.allowPrivate, maxPages: deps.maxPages });
+    const id = newId();
+    await deps.store.createRun({ id, pondRunId: null, state });
+    console.log(`try ${id} ${new URL(site).host} mode=${mode}`);
+    return c.json({ id, mode, target: state.target, report_url: reportUrl(c, id), left: TRY_PER_VISITOR - mine }, 202);
+  });
+
   const reportPageRoute = async (c: Context) => {
     const nonce = randomBytes(16).toString("base64");
     c.header("content-security-policy", contentSecurityPolicy(nonce));
@@ -273,7 +323,25 @@ export function createApp(deps: AppDeps): Hono {
     if (!run) return c.json({ error: "not found" }, 404);
     if (run.status === "queued" || run.status === "running") run = (await advanceRun(deps, id)) ?? run;
     const events = run.state.report?.events ?? run.state.events;
-    return c.json({ status: run.status, events });
+    const report = run.state.report;
+    return c.json({
+      status: run.status,
+      events,
+      ...(run.status === "failed" ? { error: run.error ?? "The test did not complete." } : {}),
+      ...(report
+        ? {
+            summary: {
+              ...verdict(report),
+              counts: counts(report.findings),
+              findings: report.findings.slice(0, 3).map((f) => ({ severity: f.severity, title: f.title })),
+              mode: report.mode,
+              pages: report.pages.filter((pg) => pg.status !== null && pg.status < 400).length,
+              seconds: Math.round(report.durationMs / 1000),
+              url: reportUrl(c, id),
+            },
+          }
+        : {}),
+    });
   });
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
