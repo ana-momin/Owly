@@ -976,3 +976,133 @@ function reachableButtons_(visited: FocusRead[]): string {
   const names = [...new Set(visited.filter((v) => v.describe.startsWith("button")).map((v) => v.name))];
   return names.length ? names.join(", ") : "none";
 }
+
+// ---------------------------------------------------------------------------
+
+/**
+ * "It said Saved. Is it saved?"
+ *
+ * The check a human tester makes without thinking and no scanner makes at all:
+ * change something, submit it, then come back with a fresh page load and see
+ * whether the change is still there. A lost write is invisible to everything
+ * Owly measured before this - the request is a clean 200, the page says Saved,
+ * the console is silent - and it is one of the worst bugs a product can have.
+ *
+ * Only forms that edit something that already exists are touched (a Save
+ * button, and a field that already holds a value), and only while Owly is
+ * signed in as the account it created itself, so the thing being edited is
+ * always Owly's own. The original value is put back afterwards.
+ */
+export async function persistUnit(s: Session, url: string, maxForms = 2): Promise<UnitResult> {
+  const unit = unitKey(s.opts.persona.key, "persist", url);
+  const result: UnitResult = { candidates: [], discovered: [], notes: [] };
+
+  await s.goto(url, READ_PATIENCE_MS);
+  const forms = await s.eval<FormInfo[]>(js.LIST_FORMS);
+
+  let checked = 0;
+  for (const form of forms) {
+    if (checked >= maxForms) break;
+    const submitName = form.submit?.name ?? "";
+    if (!/\b(save|update|change|apply|rename)\b/i.test(submitName)) continue;
+
+    const guard = assess({ name: submitName, role: "button" });
+    if (guard.risk !== "safe") {
+      result.notes.push(`Not testing whether "${submitName}" on ${path(url)} saves: ${guard.reason}.`);
+      continue;
+    }
+
+    // A field that already holds something is a field that edits something.
+    const editable = form.fields.filter((f) => (f.tag === "input" || f.tag === "textarea") && ["text", "textarea", "search"].includes(f.type));
+    let field: (typeof editable)[number] | null = null;
+    let before = "";
+    for (const candidate of editable) {
+      const value = await s.page.locator(`[data-owly-field="${candidate.key}"]`).inputValue().catch(() => "");
+      if (value.trim()) {
+        field = candidate;
+        before = value;
+        break;
+      }
+    }
+    if (!field) continue;
+    checked++;
+
+    const marker = `Owly check ${nonce()}`;
+    const mark = s.mark();
+    try {
+      await s.page.locator(`[data-owly-field="${field.key}"]`).fill(marker, { timeout: INTERACT_MS });
+      await s.page.locator(`[data-owly-submit="${form.index}"]`).click({ timeout: INTERACT_MS });
+    } catch (err) {
+      result.notes.push(`Could not test whether "${submitName}" on ${path(url)} saves: ${String(err).slice(0, 120)}.`);
+      continue;
+    }
+    await s.settle(READ_PATIENCE_MS);
+
+    // If the server said no, that is the forms probe's business, not this one.
+    const answers = s.since(mark).net.filter((r) => r.isNavigation || r.resourceType === "xhr" || r.resourceType === "fetch");
+    const refused = answers.find((r) => r.status !== null && r.status >= 400);
+    if (refused) continue;
+
+    // Come back as a new visit would, not with the back button.
+    await s.goto(url, READ_PATIENCE_MS);
+    const again = await s.eval<FormInfo[]>(js.LIST_FORMS);
+    const sameField = (again[form.index]?.fields ?? []).find(
+      (f) => (field.name && f.name === field.name) || (field.id && f.id === field.id) || f.key === field.key,
+    );
+    const now = sameField ? await s.page.locator(`[data-owly-field="${sameField.key}"]`).inputValue().catch(() => null) : null;
+    if (now === null) {
+      result.notes.push(`Could not read ${field.label || field.name} on ${path(url)} again, so whether it saved is unknown.`);
+      continue;
+    }
+    if (now === marker) {
+      // It stuck. Put it back the way it was found.
+      if (sameField) await restore(s, form.index, sameField.key, before);
+      continue;
+    }
+
+    result.candidates.push({
+      kind: "lost_write",
+      title: `"${submitName}" on ${path(url)} does not save`,
+      severity: "high",
+      url,
+      target: submitName,
+      persona: s.opts.persona.key,
+      summary: `Changing ${field.label || field.name} and pressing "${submitName}" was accepted, but the old value is back after reloading the page.`,
+      expected: "A change that is accepted is still there when the page is opened again.",
+      actual: `The field reads "${now}" again, not the value that was saved.`,
+      steps: [
+        `Open ${url}`,
+        `Change ${field.label || field.name} to something new`,
+        `Press "${submitName}"`,
+        `Open ${url} again`,
+      ],
+      evidence: [
+        { type: "dom", selector: `[name="${field.name}"]`, snippet: `value after reload: ${now.slice(0, 120)}` },
+        ...answers.slice(0, 2).map((r): Evidence => ({ type: "network", method: r.method, url: r.url, status: r.status })),
+      ],
+      observed: [
+        `submitted "${marker}"`,
+        ...answers.slice(0, 2).map((r) => `${r.method} ${r.url} -> ${r.status ?? r.error}`),
+        `after reloading, the field reads "${now.slice(0, 80)}"`,
+      ],
+      inference: ["The write is accepted and then lost: users will think the change was kept."],
+      deterministic: true,
+      fingerprint: `lost_write|${new URL(url).pathname}|${field.name || field.label}`,
+      unit,
+    });
+  }
+
+  return result;
+}
+
+/** Best effort: leave the account the way it was found. */
+async function restore(s: Session, formIndex: number, fieldKey: string, value: string): Promise<void> {
+  if (!value) return;
+  try {
+    await s.page.locator(`[data-owly-field="${fieldKey}"]`).fill(value, { timeout: INTERACT_MS });
+    await s.page.locator(`[data-owly-submit="${formIndex}"]`).click({ timeout: INTERACT_MS });
+    await s.settle(1_000);
+  } catch {
+    // Nothing to do: the value belongs to the account Owly created itself.
+  }
+}

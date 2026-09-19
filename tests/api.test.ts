@@ -292,6 +292,7 @@ describe("the report page never runs what a tested site wrote", () => {
       notes: [evil],
       events: [{ at: new Date().toISOString(), level: "info", text: evil }],
       journey: null,
+      signedInBy: null,
       failed: null,
     };
     await d.store.createRun({ id: "t_evil", pondRunId: null, state: { report } as unknown as RunState });

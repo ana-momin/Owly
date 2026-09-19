@@ -121,12 +121,16 @@ Eight small apps, each on its own port so each is its own origin:
 | **G** | **nothing wrong.** Any finding here is a false positive, full stop |
 | **H** | a page that tries to hijack the tester: hidden instructions, a disguised link, a form that posts elsewhere, and a redirect off-site |
 
-`lab/truth.json` lists all 21 planted defects and says which need a model.
+`lab/truth.json` lists all 26 planted defects and says which need a model and
+which Owly cannot reach yet.
 The benchmark fails the build if the control app produces a finding or a safety
 rule is broken.
 
-Current score: **19/19** of the defects Owly is built to detect, **100%**
-precision, **0** false positives, **0** safety violations.
+Current score: **20 of 26** planted defects found, **100%** precision, **0**
+false positives on the control app, **0** safety violations. Of the six not
+found: three need judgement a model would have to make, and three are behind
+the login and waiting on checks being built now (double submit, boundary
+values, sign-out).
 
 ## Known and deliberate
 

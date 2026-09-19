@@ -16,9 +16,10 @@ import { app as e } from "./apps/e-accessibility.js";
 import { app as f } from "./apps/f-checkout.js";
 import { app as g, userLookup } from "./apps/g-clean.js";
 import { app as h, EXFIL_PORT } from "./apps/h-injection.js";
+import { app as i, reset as resetAccounts } from "./apps/i-account.js";
 import { html, json, page, type Ctx, type LabApp } from "./kit.js";
 
-export const APPS: LabApp[] = [a, b, c, d, e, f, g, h];
+export const APPS: LabApp[] = [a, b, c, d, e, f, g, h, i];
 export const HOST = "127.0.0.1";
 
 export function appUrl(key: string): string {
@@ -111,6 +112,8 @@ export async function startLab(): Promise<Lab> {
       Promise.all(servers.map((s) => new Promise<void>((r) => { s.closeAllConnections(); s.close(() => r()); }))).then(() => undefined),
     reset: async () => {
       for (const k of Object.keys(hits)) hits[k] = {};
+      // App I keeps accounts in memory, so every run starts with nobody signed up.
+      resetAccounts();
       await fetch(`${appUrl("d")}__lab/reset`, { method: "POST" });
     },
   };

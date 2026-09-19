@@ -23,10 +23,10 @@ import { load } from "../config.js";
 import type { Evidence, Finding } from "../findings.js";
 import { createRedactor } from "../policy/redact.js";
 import { checkUrl, sameOrigin } from "../policy/urlGuard.js";
-import { launchBrowser, PERSONAS, Session, type BlockRecord, type Persona } from "../browser/session.js";
+import { launchBrowser, PERSONAS, Session, type BlockRecord, type Persona, type StorageState } from "../browser/session.js";
 import { parseUnit, unitKey, type Activity, type Candidate } from "./candidate.js";
 import { cluster, replayKey } from "./cluster.js";
-import { a11yUnit, buttonsUnit, formsUnit, keyboardUnit, layoutUnit, loadUnit, type UnitResult } from "./probes.js";
+import { a11yUnit, buttonsUnit, formsUnit, keyboardUnit, layoutUnit, loadUnit, persistUnit, type UnitResult } from "./probes.js";
 import { runJourney, type Journey } from "./journey.js";
 // The pure half: what a run may check and the state it starts from. Kept in
 // its own file so the endpoints that only create or read runs never pull a
@@ -77,6 +77,7 @@ const ACTIVITY_LABEL: Record<Activity, string> = {
   buttons: "pressing buttons",
   forms: "filling in forms",
   keyboard: "the keyboard check",
+  persist: "checking that changes are saved",
 };
 
 type Outcome<T> = { ok: true; value: T } | { ok: false; reason: "timeout" | "error"; error: string; stopSlice: boolean };
@@ -108,6 +109,9 @@ export interface RunReport {
   pages: Array<{ url: string; status: number | null }>;
   notes: string[];
   events: RunEvent[];
+  /** How Owly got in, when it did: the report says so plainly. */
+  signedInBy: string | null;
+
   /** The attempt at the site's main task. The report leads with it. */
   journey: Journey | null;
   /**
@@ -136,6 +140,17 @@ export interface RunState {
   events: RunEvent[];
   activities: Activity[];
   exploringStopped: boolean;
+  /**
+   * Cookies and storage from the moment Owly got in, as plain JSON.
+   *
+   * This is what lets a run test a product rather than a brochure: the browser
+   * dies at the end of every slice, so being signed in has to survive as data.
+   * Every session opened afterwards - in this slice, or on another instance
+   * three polls later - starts already signed in.
+   */
+  auth: StorageState | null;
+  /** How Owly got in, for the report. */
+  signedInBy: string | null;
   journey: Journey | null;
   createdAt: string;
   elapsedMs: number;
@@ -174,7 +189,13 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
     if (closing) throw new Error("slice is closing");
     return (browser ??= await launchBrowser(target, state.allowPrivate));
   };
-  const sessionOpts = (persona: Persona) => ({ target, persona, allowPrivate: state.allowPrivate, userAgentSuffix: config.userAgentSuffix });
+  const sessionOpts = (persona: Persona) => ({
+    target,
+    persona,
+    allowPrivate: state.allowPrivate,
+    userAgentSuffix: config.userAgentSuffix,
+    signedInAs: state.auth,
+  });
   const shared = async (key: Persona["key"]) => {
     let s = sessions.get(key);
     if (!s) {
@@ -284,6 +305,7 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
         if (outcome.value) {
           state.journey = outcome.value;
           applyJourney(state, outcome.value);
+          await keepTheSession(state, await shared("new_user"), outcome.value);
         }
         continue;
       }
@@ -347,7 +369,9 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
         take(loaded);
         // Finish this page before moving to the next one.
         const units: WorkItem[] = [];
-        for (const activity of ["a11y", "layout", "buttons", "forms"] as const) {
+        // "Did it save?" only applies to a product Owly is signed into, where
+        // the thing being edited belongs to the account it created itself.
+        for (const activity of ["a11y", "layout", "buttons", "forms", ...(state.auth ? (["persist"] as const) : [])] as const) {
           if (allowed.has(activity) && !(activity === "layout" && state.focus === "mobile")) {
             units.push({ kind: "unit", persona: "new_user", activity, url });
           }
@@ -442,6 +466,8 @@ async function runUnit(s: Session, activity: Activity, url: string, mode: Mode):
       return formsUnit(s, url);
     case "keyboard":
       return keyboardUnit(s, url, { pressButtons: mode === "full" });
+    case "persist":
+      return persistUnit(s, url);
     default:
       return { candidates: [], discovered: [], notes: [] };
   }
@@ -504,6 +530,38 @@ function applyJourney(state: RunState, journey: Journey): void {
     fingerprint: `task_blocked|${journey.task}`,
     unit: unitKey("new_user", "journey", state.target),
   });
+}
+
+/**
+ * If the journey got Owly through a door, hold it open.
+ *
+ * A product is not its landing page. Until now a run tested whatever a
+ * stranger could see and stopped at the login, which is the half without any
+ * of the product in it. When the journey finishes - signed up, signed in -
+ * the browser is holding a session, and this is where it is taken out of the
+ * browser and put into the run state, where it survives the slice.
+ *
+ * Nothing is stored unless the site actually gave Owly something (a cookie or
+ * stored token) AND the journey finished, so an abandoned attempt leaves no
+ * credentials lying around in the database.
+ */
+async function keepTheSession(state: RunState, s: Session, journey: Journey): Promise<void> {
+  if (!journey.completed || state.auth) return;
+  const held = await s.session();
+  const cookies = held?.cookies?.length ?? 0;
+  const stored = held?.origins?.length ?? 0;
+  if (!held || (cookies === 0 && stored === 0)) return;
+
+  state.auth = held;
+  state.signedInBy = journey.entry ? `following "${journey.entry}"` : "the main journey";
+  emit(state, "info", `Signed in ${state.signedInBy} - testing what is behind it`);
+
+  // Whatever the journey landed on is the way into the product. Explore from
+  // there as well as from the front page.
+  const landed = journey.steps.at(-1)?.url;
+  if (landed && sameOrigin(landed, state.target)) {
+    state.pending.push({ kind: "discover", url: landed, from: state.target, via: "signed in" });
+  }
 }
 
 function addBrokenLinks(
@@ -574,6 +632,7 @@ function finish(state: RunState, pages: Map<string, number | null>, sliceStart: 
     notes: [...new Set(state.notes)],
     events: state.events,
     journey: state.journey,
+    signedInBy: state.signedInBy,
     failed,
   });
   state.phase = "done";

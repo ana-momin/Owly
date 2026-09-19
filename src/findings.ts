@@ -26,6 +26,8 @@ export type FindingKind =
   | "broken_image"
   | "form_server_error"
   | "form_no_feedback"
+  /** Accepted a change and then lost it: the old value is back after a reload. */
+  | "lost_write"
   | "form_accepts_invalid"
   | "action_obscured"
   | "dead_end"
@@ -47,6 +49,7 @@ export const CATEGORY_OF: Record<FindingKind, Category> = {
   broken_image: "visual",
   form_server_error: "functional",
   form_no_feedback: "usability",
+  lost_write: "functional",
   form_accepts_invalid: "functional",
   action_obscured: "usability",
   dead_end: "usability",

@@ -93,7 +93,17 @@ export interface SessionOptions {
   persona: Persona;
   allowPrivate: boolean;
   userAgentSuffix: string;
+  /**
+   * Cookies and storage to open with: what Playwright calls a storage state.
+   * This is how a run stays signed in. A slice ends, the browser dies and the
+   * state is written to the database as plain JSON, and the next slice - maybe
+   * on another instance - opens a context that is still logged in.
+   */
+  signedInAs?: StorageState | null;
 }
+
+/** Playwright's storage state, kept structurally so the engine can store it as JSON. */
+export type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 
 export async function launchBrowser(target: URL, allowPrivate: boolean): Promise<Browser> {
   // Pin the target host to the address that passed the guard, so the browser
@@ -164,6 +174,7 @@ export class Session {
       serviceWorkers: "block",
       locale: "en-US",
       timezoneId: "UTC",
+      ...(opts.signedInAs ? { storageState: opts.signedInAs } : {}),
     });
     const page = await context.newPage();
     const session = new Session(context, page, opts);
@@ -341,6 +352,15 @@ export class Session {
 
   /** Why the last navigation produced nothing, when it produced nothing. */
   lastNavigationError: string | null = null;
+
+  /** Everything the browser now holds for this site: cookies and storage. */
+  async session(): Promise<StorageState | null> {
+    try {
+      return await this.context.storageState();
+    } catch {
+      return null;
+    }
+  }
 
   /** Content type of the last document navigation, for deciding if it is a page at all. */
   lastContentType: string | null = null;
