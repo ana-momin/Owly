@@ -17,9 +17,8 @@ const ROUTES: Array<[method: string, path: string, file: string]> = [
   ["HEAD", "/api/manifest", "api/manifest.ts"],
   ["GET", "/api/health", "api/health.ts"],
   ["POST", "/api/runs", "api/runs.ts"],
-  ["GET", "/api/tasks/:id", "api/tasks/[id].ts"],
+  ["GET", "/api/engine", "api/engine.ts"],
   ["GET", "/api/r/:id", "api/r/[id]/index.ts"],
-  ["POST", "/api/r/:id/advance", "api/r/[id]/advance.ts"],
   ["POST", "/api/try", "api/try.ts"],
 ];
 
@@ -38,5 +37,47 @@ describe("each path has a Vercel function file", () => {
   it("rewrites the short report link to the report function", () => {
     const config = JSON.parse(readFileSync("vercel.json", "utf8"));
     expect(config.rewrites).toContainEqual({ source: "/r/:id", destination: "/api/r/:id" });
+  });
+
+  it("rewrites both engine paths to the one function that has an engine", () => {
+    const config = JSON.parse(readFileSync("vercel.json", "utf8"));
+    expect(config.rewrites).toContainEqual({ source: "/api/tasks/:id", destination: "/api/engine" });
+    expect(config.rewrites).toContainEqual({ source: "/api/r/:id/advance", destination: "/api/engine" });
+    // A file for either path would take precedence over the rewrite and bring
+    // a second copy of Chromium back with it.
+    expect(existsSync("api/tasks/[id].ts")).toBe(false);
+    expect(existsSync("api/r/[id]/advance.ts")).toBe(false);
+  });
+});
+
+/**
+ * Bundle weight is a bill, not a detail.
+ *
+ * Every function that imports the engine ships Chromium with it: ~80MB, per
+ * function, per deployment. Seven of them times a day of edits used the free
+ * tier's entire 10GB of function storage. Only the two endpoints that drive a
+ * browser may import it.
+ */
+describe("only the endpoints that drive a browser carry one", () => {
+  const ENGINE = ["api/engine.ts"];
+  const LIGHT = ["api/manifest.ts", "api/health.ts", "api/runs.ts", "api/try.ts", "api/r/[id]/index.ts"];
+
+  it.each(ENGINE)("%s uses the app with the engine", (file) => {
+    expect(readFileSync(file, "utf8")).toMatch(/production-full\.js/);
+  });
+
+  it.each(LIGHT)("%s uses the app without one", (file) => {
+    const source = readFileSync(file, "utf8");
+    expect(source).toMatch(/production\.js/);
+    expect(source).not.toMatch(/production-full\.js/);
+  });
+
+  it("keeps the browser out of the shared app and the light entry", () => {
+    for (const file of ["src/api/app.ts", "src/api/production.ts"]) {
+      const source = readFileSync(file, "utf8");
+      const runtimeImports = source.split("\n").filter((l) => /^import /.test(l) && !/^import type /.test(l));
+      const reaches = runtimeImports.join("\n");
+      expect(reaches, `${file} must not import the engine`).not.toMatch(/engine\/machine\.js|full\.js|playwright|chromium/);
+    }
   });
 });

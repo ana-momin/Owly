@@ -286,6 +286,7 @@ export function reportPage(report: RunReport, nonce: string): string {
   <span class="pill">${esc(new URL(report.target).host)}</span>
   <span class="pill">${report.mode === "full" ? "Full test" : "Passive scan"}</span>
   <span class="pill">Focus: ${esc(report.focus)}</span>
+  <span class="pill">Checks: <b>${esc(report.activities.join(", "))}</b></span>
   <span class="pill">${esc(new Date(report.finishedAt).toUTCString())}</span>
 </div>
 

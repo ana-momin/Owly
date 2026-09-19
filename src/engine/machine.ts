@@ -28,6 +28,12 @@ import { parseUnit, unitKey, type Activity, type Candidate } from "./candidate.j
 import { cluster, replayKey } from "./cluster.js";
 import { a11yUnit, buttonsUnit, formsUnit, keyboardUnit, layoutUnit, loadUnit, type UnitResult } from "./probes.js";
 import { runJourney, type Journey } from "./journey.js";
+// The pure half: what a run may check and the state it starts from. Kept in
+// its own file so the endpoints that only create or read runs never pull a
+// browser into their bundle.
+import { activitiesFor, emit, newRun, normalise, type NewRunOptions } from "./plan.js";
+export { activitiesFor, newRun } from "./plan.js";
+export type { NewRunOptions } from "./plan.js";
 
 /**
  * `full` presses buttons and submits forms. `passive` only looks: it loads
@@ -137,85 +143,6 @@ export interface RunState {
   report: RunReport | null;
 }
 
-/** Which checks a mode and focus allow. The single place scope is decided. */
-export function activitiesFor(mode: Mode, focus: Focus): Activity[] {
-  const interactive: Activity[] = mode === "full" ? ["buttons", "forms"] : [];
-  switch (focus) {
-    case "forms":
-      return ["journey", "load", "links", ...interactive];
-    case "mobile":
-      return ["load", "links", "layout"];
-    case "accessibility":
-      return ["load", "links", "a11y", "keyboard"];
-    default:
-      return ["journey", "load", "links", "a11y", "layout", ...interactive, "keyboard"];
-  }
-}
-
-function normalise(url: string): string {
-  const u = new URL(url);
-  u.hash = "";
-  return u.href;
-}
-
-export interface NewRunOptions {
-  mode: Mode;
-  focus?: Focus;
-  allowPrivate?: boolean;
-  maxPages?: number;
-  maxRunMs?: number;
-}
-
-/** Validates the target before anything is stored. Throws with a reason. */
-export async function newRun(targetUrl: string, opts: NewRunOptions): Promise<RunState> {
-  const config = load();
-  const allowPrivate = opts.allowPrivate ?? config.allowPrivateTargets;
-  const verdict = await checkUrl(targetUrl, { allowPrivate });
-  if (!verdict.ok) throw new Error(verdict.reason);
-  const target = normalise(verdict.url.href);
-  const focus = opts.focus ?? "everything";
-
-  const state: RunState = {
-    v: 1,
-    target,
-    mode: opts.mode,
-    focus,
-    allowPrivate,
-    maxPages: opts.maxPages ?? config.budgets.maxPages,
-    maxRunMs: opts.maxRunMs ?? config.budgets.maxRunMs,
-    phase: "discover",
-    pending: activitiesFor(opts.mode, focus).includes("journey")
-      ? [{ kind: "journey" }, { kind: "discover", url: target, from: null, via: "start" }]
-      : [{ kind: "discover", url: target, from: null, via: "start" }],
-    pages: [],
-    referrers: [],
-    candidates: [],
-    reproduced: [],
-    blocked: [],
-    notes: [],
-    events: [],
-    activities: activitiesFor(opts.mode, focus),
-    exploringStopped: false,
-    journey: null,
-    createdAt: new Date().toISOString(),
-    elapsedMs: 0,
-    slices: 0,
-    report: null,
-  };
-  if (opts.mode === "passive") {
-    state.notes.push(
-      "Passive scan: Owly looked but did not press buttons or submit forms, because ownership of this site has not been verified.",
-    );
-  }
-  emit(state, "info", `Test queued for ${new URL(target).origin} (${opts.mode === "full" ? "full test" : "passive scan"}, focus: ${focus})`);
-  return state;
-}
-
-function emit(state: RunState, level: RunEvent["level"], text: string): void {
-  state.events.push({ at: new Date().toISOString(), level, text });
-  // A progress feed, not an audit log: the oldest lines go first.
-  if (state.events.length > 400) state.events.splice(0, state.events.length - 400);
-}
 
 export interface AdvanceOptions {
   /** Epoch ms after which no new work item starts. */

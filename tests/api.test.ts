@@ -11,7 +11,8 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createApp, type AppDeps } from "../src/api/app.js";
+import type { AppDeps } from "../src/api/app.js";
+import { createFullApp as createApp } from "../src/api/full.js";
 import { manifest } from "../src/api/manifest.js";
 import type { RunReport, RunState } from "../src/engine/machine.js";
 import { MemoryStore } from "../src/store.js";
@@ -301,4 +302,22 @@ describe("the report page never runs what a tested site wrote", () => {
     expect(html).not.toContain(`<img src=x`);
     expect(html).toContain("&lt;script&gt;alert(&quot;owly&quot;)&lt;/script&gt;");
   });
+});
+
+/**
+ * A scope that is declared and not shown is the Foxy rejection again: the
+ * report has to say what it actually ran, not just what was asked for.
+ */
+describe("the report says which checks ran", () => {
+  it("lists the activities a focused run was limited to", async () => {
+    const d = deps();
+    const app = createApp(d);
+    const started = await run(app, { run_id: "r", action_id: "start_test", parameters: { url: appUrl("g"), focus: "mobile" } });
+    const id = started.body.task_id as string;
+    await pollToEnd(app, id);
+
+    const page = await app.request(`/api/r/${id}`);
+    const html = await page.text();
+    expect(html).toContain("Checks: <b>load, links, layout</b>");
+  }, 300_000);
 });

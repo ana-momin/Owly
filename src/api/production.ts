@@ -1,5 +1,7 @@
 /**
- * The app as deployed: real database, real ownership checks.
+ * The app as deployed, WITHOUT the engine: real database, real ownership
+ * checks, no browser. Everything but Pond’s poll and the advance endpoint
+ * is served from here, so those bundles stay small.
  *
  * Every file under api/ exports this same app. They exist as separate files
  * only because Vercel's file routing decides which paths reach a function at
@@ -10,7 +12,7 @@
  */
 
 import { handle } from "hono/vercel";
-import { createApp } from "./app.js";
+import { createApp, type AppDeps } from "./app.js";
 import { load } from "../config.js";
 import { checkOwnership, instructions } from "../policy/ownership.js";
 import { neonStore } from "../store.js";
@@ -19,7 +21,7 @@ const config = load();
 const databaseUrl = process.env.DATABASE_URL ?? "";
 if (!databaseUrl) throw new Error("DATABASE_URL is not set");
 
-const app = createApp({
+export const deps: AppDeps = {
   store: await neonStore(databaseUrl),
   accessKey: process.env.POND_ACCESS_KEY ?? "",
   allowPrivate: config.allowPrivateTargets,
@@ -31,6 +33,8 @@ const app = createApp({
   sliceMs: 40_000,
   leaseMs: 100_000,
   maxPages: 15,
-});
+};
+
+const app = createApp(deps);
 
 export const handler = handle(app);

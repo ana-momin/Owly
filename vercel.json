@@ -14,6 +14,14 @@
     {
       "source": "/r/:id",
       "destination": "/api/r/:id"
+    },
+    {
+      "source": "/api/tasks/:id",
+      "destination": "/api/engine"
+    },
+    {
+      "source": "/api/r/:id/advance",
+      "destination": "/api/engine"
     }
   ],
   "headers": [

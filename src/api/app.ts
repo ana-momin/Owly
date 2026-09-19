@@ -14,7 +14,8 @@
 
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
-import { advance, newRun, type Focus, type RunState } from "../engine/machine.js";
+import type { Focus, RunState } from "../engine/machine.js";
+import { newRun } from "../engine/plan.js";
 import type { OwnershipResult } from "../policy/ownership.js";
 import { checkUrl } from "../policy/urlGuard.js";
 import { failedPage, notFoundPage, progressPage, reportPage, contentSecurityPolicy } from "../report/html.js";
@@ -71,29 +72,21 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /** One slice of a run, if nobody else is running one. Returns the run afterwards. */
-export async function advanceRun(deps: AppDeps, id: string): Promise<StoredRun | null> {
-  const claimed = await deps.store.claim(id, deps.leaseMs);
-  if (!claimed) return deps.store.getRun(id);
-  try {
-    const state = await advance(claimed.state as RunState, { deadline: Date.now() + deps.sliceMs });
-    await deps.store.saveRun(id, { status: state.phase === "done" ? "completed" : "running", state, attempts: 0 });
-  } catch (err) {
-    // The slice is discarded and the run resumes from its last saved state on
-    // the next poll. Three failures in a row and it stops, rather than
-    // billing a poll loop that can never finish.
-    const attempts = claimed.attempts + 1;
-    console.error(`run ${id} slice failed (attempt ${attempts})`, err);
-    await deps.store.saveRun(id, {
-      status: attempts >= 3 ? "failed" : "running",
-      state: claimed.state,
-      error: attempts >= 3 ? "The test could not be completed. Nothing was billed." : String(err).slice(0, 300),
-      attempts,
-    });
-  }
-  return deps.store.getRun(id);
-}
+/**
+ * Drives a run forward by one slice. Supplied by the caller rather than
+ * imported here, because the only implementation needs a browser: passing it
+ * in keeps Chromium out of every function that merely creates or reads runs.
+ * See src/api/full.ts.
+ */
+export type AdvanceFn = (deps: AppDeps, id: string) => Promise<StoredRun | null>;
 
-export function createApp(deps: AppDeps): Hono {
+export function createApp(deps: AppDeps, advanceRun?: AdvanceFn): Hono {
+  // A deployment maps the two advancing paths to the function that has an
+  // engine. If one ever reaches a bundle without it, say so loudly - a silent
+  // no-op here would leave every Pond poll running forever.
+  const drive: AdvanceFn = advanceRun ?? (async () => {
+    throw new Error("This route must be served by the function that includes the engine (src/api/full.ts).");
+  });
   const app = new Hono().basePath("/api");
 
   const origin = (c: Context) => new URL(c.req.url).origin;
@@ -231,7 +224,7 @@ export function createApp(deps: AppDeps): Hono {
     if (!run) return perr(c, "task_not_found", "That task does not exist.", 404);
 
     // The poll is the worker: one bounded slice, then report whatever is true.
-    if (run.status === "queued" || run.status === "running") run = (await advanceRun(deps, id)) ?? run;
+    if (run.status === "queued" || run.status === "running") run = (await drive(deps, id)) ?? run;
 
     const runId = run.pondRunId ?? id;
     if (run.status === "queued" || run.status === "running") {
@@ -321,7 +314,7 @@ export function createApp(deps: AppDeps): Hono {
     const id = c.req.param("id");
     let run = await deps.store.getRun(id);
     if (!run) return c.json({ error: "not found" }, 404);
-    if (run.status === "queued" || run.status === "running") run = (await advanceRun(deps, id)) ?? run;
+    if (run.status === "queued" || run.status === "running") run = (await drive(deps, id)) ?? run;
     const events = run.state.report?.events ?? run.state.events;
     const report = run.state.report;
     return c.json({
