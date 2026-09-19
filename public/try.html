@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Try Owly on your site</title>
-<meta name="description" content="Give Owly a URL and watch it work: it opens your site in a real browser and tells you what it finds, live. Free, no account, no card.">
+<meta name="description" content="Give Owly a URL. It opens your site in a real browser and tells you what it finds, live. Free, no account, no card.">
 <link rel="icon" href="/icon-32.png" sizes="32x32">
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -30,7 +30,7 @@
       <a href="/pricing">Pricing</a>
       <a href="/demo-report">A real report</a>
     </nav>
-    <a class="btn go" href="https://joinpond.ai" rel="noopener">Owly on Pond</a>
+    <a class="btn" href="https://joinpond.ai" rel="noopener">Owly on Pond</a>
   </div>
 </header>
 <div class="mobile-nav">
@@ -40,77 +40,38 @@
   <a href="/demo-report">A real report</a>
 </div>
 
-<main>
-
-<div class="hero" style="padding-bottom:0">
-  <div class="sky" aria-hidden="true">
-    <span class="moon"></span>
-    <span class="star" style="top:140px;left:9%"></span>
-    <span class="star" style="top:228px;left:28%;width:9px;height:9px"></span>
-  </div>
+<main class="try">
   <div class="w">
-    <div class="lead">
-      <span class="tape">Try it</span>
-      <h1 class="big" style="margin-top:24px">Give Owly a URL. Watch it work.</h1>
-      <p class="lede">It opens your site in a real browser and narrates what it finds. About ninety seconds. No account, no card.</p>
-    </div>
+    <div class="stage" id="stage">
 
-    <div class="chat">
-      <div class="strap">OWLY &middot; LIVE <span id="strap-note">waiting for a site</span></div>
-      <div class="log" id="log">
-        <div class="msg">
-          <img src="/icon-64.png" alt="" width="40" height="40">
-          <div class="say">
-            <p>Evening. Which site should I look at?</p>
-            <p>Paste any address &mdash; yours, or one you are curious about.</p>
-          </div>
-        </div>
-        <div class="msg">
-          <img src="/icon-64.png" alt="" width="40" height="40">
-          <div class="say note">
-            <p>If it is not verified as yours I will only look: no typing, no pressing. <a href="/how-it-works">Verifying takes one file</a> and then I can try the whole signup.</p>
-          </div>
-        </div>
+      <div class="opening">
+        <img src="/icon-192.png" alt="" width="84" height="84" decoding="async">
+        <h1>What should I look at tonight?</h1>
+        <p>Paste a URL. I open it in a real browser, try what a stranger would try, and tell you where it breaks.</p>
       </div>
-      <form class="ask" id="ask" autocomplete="off">
-        <label for="url" class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Website address</label>
+
+      <div class="thread" id="thread"></div>
+
+      <form class="composer" id="ask" autocomplete="off">
+        <label for="url" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Website address</label>
         <input id="url" name="url" type="text" inputmode="url" placeholder="yoursite.com" required>
-        <button class="btn go" id="go" type="submit">Go</button>
+        <button class="send" id="go" type="submit" aria-label="Start the test">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
       </form>
-    </div>
 
-    <div class="rules">
-      <span>3 free tests a day</span>
-      <span>never presses pay, delete, send or invite</span>
-      <span>never leaves the site it is given</span>
-      <span>only obvious test data</span>
+      <div class="chips" id="chips">
+        <button class="chip" type="button" data-url="owly-demo-rho.vercel.app">Try a site that is broken on purpose</button>
+      </div>
+
+      <p class="under-box">
+        <span>Unverified sites: <b>looks only</b>, no typing or pressing</span>
+        <span><b>3</b> free tests a day</span>
+        <span><a href="/how-it-works">How it works</a></span>
+      </p>
+
     </div>
   </div>
-</div>
-
-<section>
-  <div class="w">
-    <div class="rise">
-      <span class="tape">If you would rather not</span>
-      <h2 class="big" style="margin-top:22px">Two other ways in.</h2>
-    </div>
-    <div class="clocks rise" style="grid-template-columns:repeat(2,1fr)">
-      <div class="clock">
-        <p class="time">NO URL HANDY</p>
-        <h3>Read one I already did</h3>
-        <p>A full report of a small site whose signup fails on purpose &mdash; screenshots, steps, evidence.</p>
-        <p style="margin-top:16px"><a class="btn" href="/demo-report">Open the report</a></p>
-      </div>
-      <div class="clock">
-        <p class="time">IN A CHAT</p>
-        <h3>Use Owly on Pond</h3>
-        <p>Ask for a test in conversation, get the verdict back there, and keep your history in one place.</p>
-        <p style="margin-top:16px"><a class="btn sun" href="https://joinpond.ai" rel="noopener">Owly on Pond</a></p>
-      </div>
-    </div>
-  </div>
-</section>
-
 </main>
 
 <footer class="site">
@@ -125,7 +86,7 @@
         <a href="https://github.com/ana-momin/Owly" rel="noopener">Source</a>
       </div>
     </div>
-    <p class="fine">Owly runs rule-based checks and scripted user behaviour in a real browser. Nothing here is a language model: every line above is something the browser recorded, in the order it happened.</p>
+    <p class="fine">Nothing here is a language model. Every line is something the browser recorded, in the order it happened.</p>
   </div>
 </footer>
 
