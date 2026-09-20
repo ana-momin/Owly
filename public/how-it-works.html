@@ -25,16 +25,16 @@
   <div class="w">
     <a class="brand" href="/"><img src="/icon-64.png" alt="" width="38" height="38" decoding="async"> Owly</a>
     <nav class="main">
-      <a href="/try">Try it</a>
+      <a href="/">Try it</a>
       <a href="/how-it-works" aria-current="page">How it works</a>
       <a href="/pricing">Pricing</a>
       <a href="/demo-report">A real report</a>
     </nav>
-    <a class="btn go" href="/try">Wake Owly up</a>
+    <a class="btn go" href="/">Wake Owly up</a>
   </div>
 </header>
 <div class="mobile-nav">
-  <a href="/try">Try it</a>
+  <a href="/">Try it</a>
   <a href="/how-it-works" aria-current="page">How it works</a>
   <a href="/pricing">Pricing</a>
   <a href="/demo-report">A real report</a>
@@ -103,6 +103,9 @@
 DNS TXT   owly-verification=owly-...</pre>
     <p>Ask Owly for your token on Pond. Until it is there, a test is a passive scan: it looks at pages, layout and accessibility, and presses nothing.</p>
 
+    <h2>Where the model is, and where it is not</h2>
+    <p>Owly can hold a conversation, and that part is a language model. It is kept strictly outside the testing: it can explain a report in plainer words, and it can ask for a test to be started &mdash; but it cannot start one itself, and it is never the source of a finding. Every issue in a report is something a real browser did and recorded, twice. Ask Owly about a site it has not tested and it will tell you it has not tested it, rather than guessing.</p>
+
     <h2>What it cannot find</h2>
     <p>Anything that needs judgement: a confusing label, an unhelpful error message, a total that is wrong but renders perfectly. Owly says so rather than guessing &mdash; its own benchmark counts those as misses.</p>
 
@@ -133,7 +136,7 @@ DNS TXT   owly-verification=owly-...</pre>
     <div class="cols">
       <a class="brand" href="/"><img src="/icon-64.png" alt="" width="38" height="38" decoding="async"> Owly</a>
       <div class="links">
-        <a href="/try">Try it</a>
+        <a href="/">Try it</a>
       <a href="/how-it-works">How it works</a>
         <a href="/pricing">Pricing</a>
         <a href="/demo-report">A real report</a>

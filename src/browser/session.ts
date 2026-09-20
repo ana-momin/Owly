@@ -14,7 +14,7 @@
  */
 
 import type { Browser, BrowserContext, Page, Request } from "playwright-core";
-import { checkUrl, pinArgs, sameOrigin } from "../policy/urlGuard.js";
+import { checkUrl, pinArgs, sameSite } from "../policy/urlGuard.js";
 import type { Viewport } from "../findings.js";
 
 export interface Persona {
@@ -208,7 +208,7 @@ export class Session {
         return route.abort("blockedbyclient");
       };
 
-      if (isTopNavigation && !sameOrigin(url, opts.target)) {
+      if (isTopNavigation && !sameSite(url, opts.target)) {
         return refuse("navigation away from the site under test");
       }
 
@@ -272,10 +272,10 @@ export class Session {
       // form which posts and then redirects looked like it had never answered.
       record.status = record.status ?? response?.status() ?? null;
       const type = request.resourceType();
-      if (response && type === "document" && sameOrigin(request.url(), opts.target)) {
+      if (response && type === "document" && sameSite(request.url(), opts.target)) {
         record.headers = response.headers();
       }
-      if (response && (type === "document" || type === "script") && sameOrigin(request.url(), opts.target)) {
+      if (response && (type === "document" || type === "script") && sameSite(request.url(), opts.target)) {
         const body = await response.text().catch(() => "");
         if (body.length < 500_000) this.sources.set(request.url(), body);
       }
@@ -287,7 +287,7 @@ export class Session {
       const record = this.inflight.get(response.request());
       if (!record) return;
       record.status = response.status();
-      if (response.request().resourceType() === "document" && sameOrigin(response.url(), opts.target)) {
+      if (response.request().resourceType() === "document" && sameSite(response.url(), opts.target)) {
         record.headers = response.headers();
       }
     });

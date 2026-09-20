@@ -20,7 +20,14 @@ purpose. Nothing in it is staged: the screenshots are what the browser showed.
 
 It is not an AI in its checks. Owly runs rule-based checks and scripted user
 behaviour, and everything it reports comes from something the browser actually
-recorded. The conversation you have with it is Pond's.
+recorded.
+
+There is a model in the conversation on the site, and it is fenced off from
+all of that. It can explain a report and it can ask for a test to be started;
+it cannot start one, and it is never the source of a finding. With no API key
+configured it falls back to spotting an address in what you typed, and the
+product works exactly as before - the model makes Owly nicer to talk to, not
+better at testing. See `src/api/chat.ts`.
 
 ---
 

@@ -22,7 +22,7 @@ import type { Browser } from "playwright-core";
 import { load } from "../config.js";
 import type { Evidence, Finding } from "../findings.js";
 import { createRedactor } from "../policy/redact.js";
-import { checkUrl, sameOrigin } from "../policy/urlGuard.js";
+import { checkUrl, sameSite } from "../policy/urlGuard.js";
 import { launchBrowser, PERSONAS, Session, type BlockRecord, type Persona, type StorageState } from "../browser/session.js";
 import { parseUnit, unitKey, type Activity, type Candidate } from "./candidate.js";
 import { cluster, replayKey } from "./cluster.js";
@@ -369,7 +369,7 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
         } catch {
           continue;
         }
-        if (!sameOrigin(url, target)) continue;
+        if (!sameSite(url, target)) continue;
         if (item.from && !item.tries) referrers.set(url, [...(referrers.get(url) ?? []), { from: item.from, via: item.via }]);
         if (pages.has(url) || state.exploringStopped) continue;
 
@@ -423,7 +423,7 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
           if (state.labels.length < 200 && !state.labels.includes(label)) state.labels.push(label);
         }
         for (const found of [...loaded.discovered, ...loaded.refusedLinks]) {
-          if (!state.signOutUrl && /\b(sign|log)\s?out\b/i.test(found.via) && sameOrigin(found.url, target)) {
+          if (!state.signOutUrl && /\b(sign|log)\s?out\b/i.test(found.via) && sameSite(found.url, target)) {
             state.signOutUrl = found.url;
           }
         }
@@ -623,7 +623,7 @@ async function keepTheSession(state: RunState, s: Session, journey: Journey): Pr
   // Whatever the journey landed on is the way into the product. Explore from
   // there as well as from the front page.
   const landed = journey.steps.at(-1)?.url;
-  if (landed && sameOrigin(landed, state.target)) {
+  if (landed && sameSite(landed, state.target)) {
     state.pending.push({ kind: "discover", url: landed, from: state.target, via: "signed in" });
   }
 }

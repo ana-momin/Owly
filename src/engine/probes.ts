@@ -12,7 +12,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import type { Evidence, Severity } from "../findings.js";
 import { assess } from "../policy/actionGuard.js";
-import { sameOrigin } from "../policy/urlGuard.js";
+import { sameSite } from "../policy/urlGuard.js";
 import * as js from "../browser/inpage.js";
 import type { NetRecord, Session } from "../browser/session.js";
 import { unitKey, type Candidate } from "./candidate.js";
@@ -148,7 +148,7 @@ function passiveCandidates(
 
   for (const r of events.net) {
     if (r.blockedByOwly) continue;
-    if (!sameOrigin(r.url, target)) continue;
+    if (!sameSite(r.url, target)) continue;
     // The page's own document is judged by the crawler as a link, not here.
     if (r.isNavigation && r.resourceType === "document") continue;
 
@@ -264,7 +264,7 @@ export async function loadUnit(
     return result;
   }
 
-  const refused = s.since(mark).blocked.find((b) => !sameOrigin(b.url, s.opts.target));
+  const refused = s.since(mark).blocked.find((b) => !sameSite(b.url, s.opts.target));
   const landedOnRequest = (() => {
     try {
       return new URL(finalUrl).href.replace(/\/$/, "") === new URL(url).href.replace(/\/$/, "");
@@ -272,7 +272,7 @@ export async function loadUnit(
       return false;
     }
   })();
-  const landedOffSite = !finalUrl || !sameOrigin(finalUrl, s.opts.target);
+  const landedOffSite = !finalUrl || !sameSite(finalUrl, s.opts.target);
   if (landedOffSite || (refused && !landedOnRequest)) {
     result.leftTheSite = (landedOffSite ? finalUrl : refused?.url) || refused?.url || finalUrl;
     result.notes.push(`${path(url)} leads off the site (to ${new URL(result.leftTheSite).origin}), so Owly stopped there.`);
@@ -351,7 +351,7 @@ export async function loadUnit(
     } catch {
       continue;
     }
-    if (!sameOrigin(clean, s.opts.target)) continue;
+    if (!sameSite(clean, s.opts.target)) continue;
     if (assess({ name: link.text, role: "link", target: clean }).risk === "destructive") {
       result.notes.push(`Not following "${link.text}" (${path(clean)}): it looks like it acts on visit.`);
       // Refused, but remembered: signing out is the one of these Owly needs to
@@ -385,7 +385,14 @@ export async function a11yUnit(s: Session, url: string): Promise<UnitResult> {
   const status = await s.goto(url, READ_PATIENCE_MS);
   if (status !== null && status >= 400) return result;
 
-  await s.page.addScriptTag({ content: axe() });
+  // Evaluated, not added as a <script> tag. A tag is subject to the page's
+  // Content-Security-Policy, so on any site with a real CSP - which is to say
+  // most sites worth testing - injecting axe threw and the accessibility scan
+  // silently did nothing. Evaluation goes through the debugger protocol, which
+  // CSP does not govern, so the scan works on a well-secured site too.
+  if (!(await s.eval<boolean>(`typeof axe !== "undefined"`).catch(() => false))) {
+    await s.page.evaluate(axe());
+  }
   // WCAG A and AA rules only. axe's "best practice" rules are advice, not
   // failures, and reporting them as defects is how accessibility tools earn a
   // reputation for noise.
@@ -568,7 +575,7 @@ export async function buttonsUnit(s: Session, url: string, maxButtons = 8): Prom
     result.candidates.push(...passiveCandidates(s, s.since(mark), url, unit, steps, b.name));
 
     const now = s.page.url();
-    if (now !== url && sameOrigin(now, s.opts.target)) {
+    if (now !== url && sameSite(now, s.opts.target)) {
       result.discovered.push({ url: now, from: url, via: b.name });
     }
   }
@@ -661,7 +668,7 @@ export async function fillAndSubmit(
 
   const requests = s
     .since(mark)
-    .net.filter((r) => !r.blockedByOwly && sameOrigin(r.url, s.opts.target) && ["fetch", "xhr", "document"].includes(r.resourceType));
+    .net.filter((r) => !r.blockedByOwly && sameSite(r.url, s.opts.target) && ["fetch", "xhr", "document"].includes(r.resourceType));
 
   return {
     requests,
@@ -688,7 +695,7 @@ export async function formsUnit(s: Session, url: string, maxForms = 3): Promise<
 
   for (const form of forms) {
     if (!form.submit) continue;
-    if (!sameOrigin(form.action, s.opts.target)) {
+    if (!sameSite(form.action, s.opts.target)) {
       result.notes.push(`Not submitting a form on ${path(url)}: it sends data to another site (${form.action}).`);
       continue;
     }
@@ -860,7 +867,7 @@ export async function formsUnit(s: Session, url: string, maxForms = 3): Promise<
       });
     }
 
-    if (first.urlAfter !== first.urlBefore && sameOrigin(first.urlAfter, s.opts.target)) {
+    if (first.urlAfter !== first.urlBefore && sameSite(first.urlAfter, s.opts.target)) {
       result.discovered.push({ url: first.urlAfter, from: url, via: `submitting "${submitName}"` });
     }
 

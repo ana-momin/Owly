@@ -14,7 +14,7 @@
 
 import type { Evidence } from "../findings.js";
 import { assess } from "../policy/actionGuard.js";
-import { sameOrigin } from "../policy/urlGuard.js";
+import { sameSite } from "../policy/urlGuard.js";
 import * as journeyJs from "../browser/journey-inpage.js";
 import * as js from "../browser/inpage.js";
 import type { NetRecord, Session } from "../browser/session.js";
@@ -265,7 +265,7 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
   }
 
   const afterClick = await s.eval<Outcome>(journeyJs.READ_OUTCOME);
-  const leftSite = s.since(mark).blocked.some((b) => !sameOrigin(b.url, s.opts.target));
+  const leftSite = s.since(mark).blocked.some((b) => !sameSite(b.url, s.opts.target));
   if (leftSite) {
     await step(`Press "${entry.name}"`, "It leads to another website, so Owly stopped there.", true, at);
     observed.push(`"${entry.name}" leaves the site, so the rest of the journey is not Owly's to test.`);
@@ -350,7 +350,7 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
       hardFailure: false,
     };
   }
-  if (formInfo.action && !sameOrigin(formInfo.action, s.opts.target)) {
+  if (formInfo.action && !sameSite(formInfo.action, s.opts.target)) {
     return {
       task: chosenTask,
       goal: task.goal,
@@ -424,7 +424,7 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
   await s.settle(10_000);
   const after = await s.eval<Outcome>(journeyJs.READ_OUTCOME).catch(() => null);
   const events = s.since(mark);
-  const requests = events.net.filter((r) => !r.blockedByOwly && sameOrigin(r.url, s.opts.target) && ["fetch", "xhr", "document"].includes(r.resourceType));
+  const requests = events.net.filter((r) => !r.blockedByOwly && sameSite(r.url, s.opts.target) && ["fetch", "xhr", "document"].includes(r.resourceType));
   const mutations = requests.filter(isMutation);
   const failed = mutations.filter((r) => r.status === null || r.status >= 500);
   const rejected = mutations.filter((r) => r.status !== null && r.status >= 400 && r.status < 500);

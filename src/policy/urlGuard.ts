@@ -144,6 +144,29 @@ export function sameOrigin(a: URL | string, b: URL | string): boolean {
 }
 
 /**
+ * The same site, as a person means it.
+ *
+ * Strict origin equality is the wrong question for "is this still the site I
+ * was asked to test". Ask for facebook.com and you land on www.facebook.com;
+ * by origin that is somewhere else, so Owly would announce that the home page
+ * "leads off the site" and stop having tested nothing. Most of the web
+ * redirects between the apex and www in one direction or the other, so that
+ * one comparison was enough to make Owly useless on real sites while every
+ * lab app passed.
+ *
+ * Only the leading "www." is ignored, and the scheme and port still have to
+ * match. This is not a security boundary: every request is checked against the
+ * SSRF rules by `checkUrl` whatever its host, so nothing here decides what
+ * Owly is allowed to reach - only what it considers part of the same product.
+ */
+export function sameSite(a: URL | string, b: URL | string): boolean {
+  const x = typeof a === "string" ? new URL(a) : a;
+  const y = typeof b === "string" ? new URL(b) : b;
+  const bare = (u: URL) => u.hostname.replace(/^www\./i, "").toLowerCase();
+  return x.protocol === y.protocol && x.port === y.port && bare(x) === bare(y);
+}
+
+/**
  * Chromium flags that pin the target host to the address we validated, so the
  * browser cannot be handed a different one later for the site under test.
  */

@@ -20,6 +20,7 @@ const ROUTES: Array<[method: string, path: string, file: string]> = [
   ["GET", "/api/engine", "api/engine.ts"],
   ["GET", "/api/r/:id", "api/r/[id]/index.ts"],
   ["POST", "/api/try", "api/try.ts"],
+  ["POST", "/api/chat", "api/chat.ts"],
 ];
 
 describe("each path has a Vercel function file", () => {
@@ -60,7 +61,7 @@ describe("each path has a Vercel function file", () => {
  */
 describe("only the endpoints that drive a browser carry one", () => {
   const ENGINE = ["api/engine.ts"];
-  const LIGHT = ["api/manifest.ts", "api/health.ts", "api/runs.ts", "api/try.ts", "api/r/[id]/index.ts"];
+  const LIGHT = ["api/manifest.ts", "api/health.ts", "api/runs.ts", "api/try.ts", "api/chat.ts", "api/r/[id]/index.ts"];
 
   it.each(ENGINE)("%s uses the app with the engine", (file) => {
     expect(readFileSync(file, "utf8")).toMatch(/production-full\.js/);

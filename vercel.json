@@ -40,5 +40,12 @@
     }
   ],
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/try",
+      "destination": "/",
+      "permanent": true
+    }
+  ]
 }

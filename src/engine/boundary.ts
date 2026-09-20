@@ -21,7 +21,7 @@ import type { Evidence } from "../findings.js";
 import type { NetRecord, Session } from "../browser/session.js";
 import * as js from "../browser/inpage.js";
 import { assess } from "../policy/actionGuard.js";
-import { sameOrigin } from "../policy/urlGuard.js";
+import { sameSite } from "../policy/urlGuard.js";
 import { unitKey, type Candidate } from "./candidate.js";
 import type { FormInfo, UnitResult } from "./probes.js";
 import { fillAndSubmit, path } from "./probes.js";
@@ -51,7 +51,7 @@ export async function boundaryUnit(s: Session, url: string, maxForms = 2): Promi
 
   for (const form of forms) {
     if (!form.submit || form.fields.length === 0) continue;
-    if (!sameOrigin(form.action, s.opts.target)) continue;
+    if (!sameSite(form.action, s.opts.target)) continue;
     if (assess({ name: form.submit.name, role: "submit", target: form.action, method: form.method }).risk === "destructive") {
       continue;
     }

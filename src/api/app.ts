@@ -23,6 +23,7 @@ import { counts, pondMarkdown, verdict } from "../report/text.js";
 import type { Store, StoredRun } from "../store.js";
 import { ACTIONS, AGENT_VERSION, manifest, MAX_REQUEST_BYTES, PROTOCOL_VERSION } from "./manifest.js";
 import { Invalid, validate } from "./params.js";
+import { decide, type ChatMessage } from "./chat.js";
 
 export interface AppDeps {
   store: Store;
@@ -43,6 +44,8 @@ type Json = Record<string, unknown>;
 /** What the free try-it page allows: per visitor a day, and for everyone a day. */
 const TRY_PER_VISITOR = 3;
 const TRY_PER_DAY = 30;
+/** Turns of conversation one visitor gets a day. Talking is cheap, not free. */
+const CHAT_PER_VISITOR = 40;
 
 function perr(c: Context, code: string, message: string, status: number, runId?: string, details?: Json) {
   const body: Json = { error: { code, message, ...(details ? { details } : {}) } };
@@ -295,6 +298,45 @@ export function createApp(deps: AppDeps, advanceRun?: AdvanceFn): Hono {
     await deps.store.createRun({ id, pondRunId: null, state });
     console.log(`try ${id} ${new URL(site).host} mode=${mode}`);
     return c.json({ id, mode, target: state.target, report_url: reportUrl(c, id), left: TRY_PER_VISITOR - mine }, 202);
+  });
+
+  /**
+   * The conversation on the site. It decides what a turn means and, when the
+   * visitor is asking for a test, hands back the address for the page to
+   * start through /try - which is where the rate limits and the ownership
+   * check live. Nothing here can start a run on its own.
+   */
+  app.post("/chat", async (c) => {
+    let body: Json;
+    try {
+      body = (await c.req.json()) as Json;
+    } catch {
+      return perr(c, "invalid_input", "Send a JSON body with messages.", 400);
+    }
+    const raw = Array.isArray(body.messages) ? body.messages : [];
+    const history: ChatMessage[] = [];
+    for (const m of raw.slice(-12)) {
+      if (!m || typeof m !== "object") continue;
+      const role = (m as Json).role;
+      const content = (m as Json).content;
+      if ((role === "user" || role === "assistant") && typeof content === "string" && content.trim()) {
+        history.push({ role, content: content.slice(0, 4000) });
+      }
+    }
+    if (!history.length) return perr(c, "invalid_input", "Say something first.", 422, undefined, { field: "messages" });
+
+    // Talking is cheap but not free: a model call per turn still costs
+    // somebody's quota, so the same visitor cannot hold the line open.
+    const day = new Date().toISOString().slice(0, 10);
+    const who = (c.req.header("x-forwarded-for") ?? "").split(",")[0]!.trim() || "unknown";
+    const turns = await deps.store.bump(`chat:${day}:${who}`);
+    if (turns > CHAT_PER_VISITOR) {
+      return c.json({ reply: "That is enough talking for today. The tests themselves still work from the box below tomorrow.", test: null, by_model: false });
+    }
+
+    const reportText = typeof body.report === "string" ? body.report.slice(0, 20_000) : null;
+    const decision = await decide(history, reportText);
+    return c.json({ reply: decision.reply, test: decision.test, by_model: decision.byModel });
   });
 
   const reportPageRoute = async (c: Context) => {

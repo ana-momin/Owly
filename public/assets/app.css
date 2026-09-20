@@ -1,0 +1,377 @@
+/**
+ * The chat app.
+ *
+ * The rest of the site is loud on purpose - thick borders, hard shadows, a
+ * little tilt. This page is the opposite, because it is not a poster, it is a
+ * tool you sit in front of and type into. Everything here is quiet so that
+ * the only things with any weight are the owl, what you typed, and what Owly
+ * found.
+ *
+ * Same palette as the site, so it is recognisably the same product. Almost no
+ * borders, one radius, one accent.
+ */
+
+:root {
+  --paper: #f7f1e4;
+  --surface: #fffaf0;
+  --ink: #21203a;
+  --muted: #605e80;
+  --faint: #8b89a6;
+  --lav: #8f6fd4;
+  --lav-soft: #ece4fa;
+  --edge: rgba(33, 32, 58, .10);
+  --edge-soft: rgba(33, 32, 58, .06);
+  --bad: #c2402c;
+  --good: #2f8f5b;
+
+  --display: "Fredoka", ui-rounded, "Segoe UI", sans-serif;
+  --body: "Nunito Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --r: 26px;
+  --col: 46rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #17162a;
+    --surface: #1e1d34;
+    --ink: #f2eee6;
+    --muted: #b3b0c9;
+    --faint: #8886a3;
+    --lav: #b79ce6;
+    --lav-soft: #2b2749;
+    --edge: rgba(242, 238, 230, .13);
+    --edge-soft: rgba(242, 238, 230, .07);
+    --bad: #ef8a76;
+    --good: #7fd2a3;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #17162a;
+  --surface: #1e1d34;
+  --ink: #f2eee6;
+  --muted: #b3b0c9;
+  --faint: #8886a3;
+  --lav: #b79ce6;
+  --lav-soft: #2b2749;
+  --edge: rgba(242, 238, 230, .13);
+  --edge-soft: rgba(242, 238, 230, .07);
+  --bad: #ef8a76;
+  --good: #7fd2a3;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; }
+
+/*
+ * `hidden` is a presentation hint and any `display` rule outranks it, so the
+ * suggestion chips below - which are a flex row - stayed on screen after the
+ * conversation had started. Settle it once, here, rather than remembering to
+ * pair every display rule with a hidden one.
+ */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+a { color: inherit; }
+::selection { background: var(--lav-soft); }
+
+/* ---------------------------------------------------------------- top bar */
+
+.top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--edge-soft);
+}
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: -.01em;
+}
+.mark img { display: block; width: 28px; height: 28px; }
+.top nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.top nav a, .icon-btn {
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.top nav a:hover, .icon-btn:hover { color: var(--ink); background: var(--edge-soft); }
+.icon-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: var(--muted); }
+.icon-btn svg { width: 17px; height: 17px; }
+@media (max-width: 640px) { .top nav a.hide-sm { display: none; } }
+
+/* ------------------------------------------------------------------ stage */
+
+main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.col { width: min(var(--col), 100%); margin: 0 auto; padding: 0 16px; }
+
+/*
+ * Before the first message the greeting and the box belong together in the
+ * middle of the screen, the way every chat app does it. Letting the scroller
+ * take all the height instead left the owl stranded a third of a page above
+ * the thing you are meant to type into.
+ */
+main:has(.scroll.empty) { justify-content: center; padding-bottom: 7vh; }
+.scroll.empty { flex: 0 0 auto; overflow: visible; }
+
+.hello { text-align: center; padding: 8px 0 4px; }
+.hello img { width: 68px; height: 68px; display: block; margin: 0 auto 16px; border-radius: 18px; }
+.hello h1 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(25px, 5vw, 33px);
+  line-height: 1.22;
+  letter-spacing: -.02em;
+  margin: 0 0 8px;
+}
+.hello p { margin: 0; color: var(--muted); font-size: 16px; }
+
+/* --------------------------------------------------------------- messages */
+
+.thread { padding: 26px 0 8px; display: flex; flex-direction: column; gap: 22px; }
+
+.turn { display: flex; }
+.turn.you { justify-content: flex-end; }
+.turn.you .bubble {
+  background: var(--lav-soft);
+  padding: 11px 17px;
+  border-radius: 20px 20px 6px 20px;
+  max-width: 82%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.turn.owly { gap: 12px; align-items: flex-start; }
+.turn.owly .face {
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  margin-top: 2px;
+  border-radius: 50%;
+}
+.turn.owly .say { min-width: 0; flex: 1 1 auto; }
+.turn.owly .say > :first-child { margin-top: 0; }
+.turn.owly .say > :last-child { margin-bottom: 0; }
+.turn.owly p { margin: 0 0 11px; }
+.turn.owly b, .turn.owly strong { font-weight: 700; }
+.turn.owly code {
+  font-family: var(--mono);
+  font-size: .88em;
+  background: var(--edge-soft);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+/* ------------------------------------------------------------ run in flight */
+
+.work {
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 14px 16px;
+  margin: 2px 0 11px;
+}
+.work .now {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.work .now .dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lav);
+  animation: pulse 1.15s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .work .now .dot { animation: none; opacity: .8; } }
+.work .now .clock { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--faint); font-size: 13.5px; }
+.work .now .text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.work ul { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.work li { display: flex; gap: 9px; font-size: 14.5px; align-items: baseline; }
+.work li .tag {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--faint);
+  min-width: 58px;
+}
+.work li.found .tag { color: var(--bad); }
+.work li.checking .tag { color: var(--lav); }
+.work li.clear .tag { color: var(--good); }
+
+/* ------------------------------------------------------------------ report */
+
+.result { border: 1px solid var(--edge); border-radius: 18px; background: var(--surface); overflow: hidden; margin-bottom: 11px; }
+.result .head { padding: 15px 17px 13px; border-bottom: 1px solid var(--edge-soft); }
+.result .head h2 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0 0 3px; letter-spacing: -.01em; }
+.result .head .sub { font-size: 13.5px; color: var(--faint); }
+.result .body { padding: 13px 17px 15px; display: flex; flex-direction: column; gap: 11px; }
+.result .item { display: flex; gap: 11px; align-items: baseline; }
+.result .sev {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--edge-soft);
+  color: var(--muted);
+}
+.result .sev.critical, .result .sev.high { background: rgba(194, 64, 44, .13); color: var(--bad); }
+.result .item .what { font-size: 15px; }
+.result .foot { padding: 12px 17px; border-top: 1px solid var(--edge-soft); display: flex; gap: 10px; flex-wrap: wrap; }
+
+.linkish {
+  font: inherit;
+  font-size: 14.5px;
+  font-family: var(--display);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.linkish:hover { background: var(--edge-soft); }
+.linkish.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.linkish.primary:hover { opacity: .88; }
+
+/* ---------------------------------------------------------------- composer */
+
+.dock { flex: 0 0 auto; padding: 14px 0 14px; background: var(--paper); }
+
+form.box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  padding: 8px 8px 8px 18px;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+form.box:focus-within {
+  border-color: var(--lav);
+  box-shadow: 0 0 0 3px var(--lav-soft);
+}
+form.box textarea {
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.55;
+  padding: 9px 0;
+  max-height: 42vh;
+}
+form.box textarea::placeholder { color: var(--faint); }
+
+.send {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+  transition: opacity .14s ease;
+}
+.send svg { width: 18px; height: 18px; }
+.send:disabled { opacity: .28; cursor: default; }
+.send.stop { background: var(--bad); }
+
+.hint {
+  margin: 9px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--faint);
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.hint a { color: var(--muted); }
+.hint .sep { opacity: .45; }
+
+.suggest { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 16px 0 0; }
+.suggest button {
+  font: inherit;
+  font-size: 14px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  padding: 8px 15px;
+  cursor: pointer;
+}
+.suggest button:hover { color: var(--ink); background: var(--edge-soft); border-color: var(--edge); }
+
+.oops { color: var(--bad); font-size: 15px; }
+
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  .col { padding: 0 14px; }
+  .hello img { width: 58px; height: 58px; }
+}
