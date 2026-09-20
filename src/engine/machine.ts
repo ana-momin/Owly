@@ -208,6 +208,19 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
     // An attempt abandoned after a timeout may still be running; it must not
     // launch a fresh browser after this slice has shut down.
     if (closing) throw new Error("slice is closing");
+    // A serverless Chromium can die mid-slice - a page that hung through its
+    // own timeout, a context that took the single process down with it. The
+    // handle stays cached and every later item fails with "target, context or
+    // browser has been closed", which in production meant the security checks
+    // were skipped on runs that were otherwise fine. A dead browser is
+    // replaced rather than handed out again.
+    if (browser && !browser.isConnected()) {
+      for (const [key, session] of sessions) {
+        sessions.delete(key);
+        await session.close().catch(() => undefined);
+      }
+      browser = null;
+    }
     return (browser ??= await launchBrowser(target, state.allowPrivate));
   };
   const sessionOpts = (persona: Persona) => ({

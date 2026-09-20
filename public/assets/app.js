@@ -258,7 +258,12 @@
      */
     var claims = {};
     function claim(text, level) {
-      var body = text.replace(/^(possible issue|confirmed|dropped|dismissed)\s*:\s*/i, "").trim();
+      // Every prefix the engine puts in front of the same sentence. Missing
+      // one shows up as the line appearing twice, which is exactly the
+      // stutter this is here to prevent.
+      var body = text
+        .replace(/^(possible issue|confirmed|likely|dropped|dismissed|could not reproduce, so not reported)\s*:\s*/i, "")
+        .trim();
       var known = claims[body];
       var kind = level === "confirmed" ? "found" : level === "suspect" ? "checking" : "";
       if (known) {
