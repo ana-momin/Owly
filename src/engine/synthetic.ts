@@ -16,6 +16,8 @@ export interface FieldInfo {
   required: boolean;
   min: string | null;
   max: string | null;
+  /** The page's own limit on length, when it sets one. */
+  maxLength: number | null;
   options: string[];
 }
 
@@ -67,4 +69,20 @@ export function valueFor(field: FieldInfo, nonce: string): FillValue | null {
 
 export function nonce(): string {
   return Math.random().toString(36).slice(2, 8);
+}
+
+/**
+ * The part of a filled-in value that identifies the account Owly made, if any.
+ *
+ * This is what turns a guess into evidence. "This page loaded without a
+ * session" only means something if the page is actually private, and the way
+ * to know that is to find Owly's own email printed on it. Passwords are never
+ * markers: they are not shown back, and nothing should be looking for them.
+ */
+export function identityMarker(field: FieldInfo, value: string): string | null {
+  if (field.type === "password" || has(field, /pass(word)?/i)) return null;
+  if (isEmailField(field)) return value;
+  if (has(field, /user(name)?|login|handle/i)) return value;
+  if (has(field, /name/i)) return value;
+  return null;
 }

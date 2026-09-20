@@ -18,7 +18,7 @@ import type { Focus, Mode, RunEvent, RunState } from "./machine.js";
 
 /** Which checks a mode and focus allow. The single place scope is decided. */
 export function activitiesFor(mode: Mode, focus: Focus): Activity[] {
-  const interactive: Activity[] = mode === "full" ? ["buttons", "forms", "persist"] : [];
+  const interactive: Activity[] = mode === "full" ? ["buttons", "forms", "persist", "boundary"] : [];
   switch (focus) {
     case "forms":
       return ["journey", "load", "links", ...interactive];
@@ -27,7 +27,7 @@ export function activitiesFor(mode: Mode, focus: Focus): Activity[] {
     case "accessibility":
       return ["load", "links", "a11y", "keyboard"];
     default:
-      return ["journey", "load", "links", "a11y", "layout", ...interactive, "keyboard"];
+      return ["journey", "load", "links", "a11y", "layout", ...interactive, "keyboard", "security"];
   }
 }
 
@@ -81,6 +81,10 @@ export async function newRun(targetUrl: string, opts: NewRunOptions): Promise<Ru
     events: [],
     activities: activitiesFor(opts.mode, focus),
     exploringStopped: false,
+    behindLogin: [],
+    labels: [],
+    signOutUrl: null,
+    identity: [],
     auth: null,
     signedInBy: null,
     journey: null,

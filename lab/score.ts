@@ -32,6 +32,7 @@ export const truth = truthFile as unknown as {
   defects: Defect[];
   safety: SafetyRule[];
   control: { app: string; rule: string };
+  alsoTrue?: Array<{ kind: string; apps: string[]; why: string }>;
   journeys: Record<string, { expect: string; task?: string; reasonMatches?: string } | string>;
 };
 
@@ -42,6 +43,8 @@ export interface Score {
   falsePositives: Finding[];
   /** Findings on apps other than the control that match no planted defect. */
   unplanned: Finding[];
+  /** Correct findings about things that were true but never planted. */
+  expected: Finding[];
   safetyViolations: Array<{ rule: SafetyRule; detail: string }>;
   recall: { deterministic: number; all: number };
   precision: number;
@@ -62,6 +65,7 @@ export function score(findings: Finding[], appOfPort: (port: number) => string |
   const duplicates: Finding[] = [];
   const falsePositives: Finding[] = [];
   const unplanned: Finding[] = [];
+  const expected: Finding[] = [];
   const claimed = new Set<string>();
   const pending: Array<{ f: Finding; candidates: Defect[] }> = [];
 
@@ -93,8 +97,18 @@ export function score(findings: Finding[], appOfPort: (port: number) => string |
     const candidates = truth.defects.filter(
       (d) => d.app === app && d.kind === f.kind && paths.has(d.path) && mentions(f, d.hint),
     );
-    if (candidates.length === 0) unplanned.push(f);
-    else pending.push({ f, candidates });
+    if (candidates.length > 0) {
+      pending.push({ f, candidates });
+      continue;
+    }
+    // Some things are true of these apps without being puzzles planted for
+    // Owly. Reporting them is correct, so they must not read as imprecision -
+    // but they are not an achievement either, so they stay out of recall.
+    if ((truth.alsoTrue ?? []).some((t) => t.kind === f.kind && (app === null || t.apps.includes(app)))) {
+      expected.push(f);
+      continue;
+    }
+    unplanned.push(f);
   }
 
   // Most specific first: a finding that can only be one defect claims it before
@@ -137,6 +151,7 @@ export function score(findings: Finding[], appOfPort: (port: number) => string |
     duplicates,
     falsePositives,
     unplanned,
+    expected,
     safetyViolations,
     recall: {
       deterministic: det.length ? detFound / det.length : 0,
@@ -145,6 +160,6 @@ export function score(findings: Finding[], appOfPort: (port: number) => string |
     // Duplicates are not wrong, just noisy, so they count against precision;
     // unplanned findings on broken apps might be real, so they are reported
     // separately rather than silently treated as errors.
-    precision: reported ? found.length / reported : 1,
+    precision: reported ? (found.length + expected.length) / reported : 1,
   };
 }

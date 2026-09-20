@@ -16,7 +16,7 @@ import { sameOrigin } from "../policy/urlGuard.js";
 import * as js from "../browser/inpage.js";
 import type { NetRecord, Session } from "../browser/session.js";
 import { unitKey, type Candidate } from "./candidate.js";
-import { INVALID_EMAIL, isEmailField, nonce, valueFor, type FieldInfo } from "./synthetic.js";
+import { INVALID_EMAIL, isEmailField, nonce, valueFor, type FieldInfo, type FillValue } from "./synthetic.js";
 
 /** A page Owly learned about while running a unit. */
 export interface Discovery {
@@ -29,6 +29,8 @@ export interface UnitResult {
   candidates: Candidate[];
   discovered: Discovery[];
   notes: string[];
+  /** Same-origin links the guard refused to follow, with the words on them. */
+  refusedLinks: Array<{ url: string; via: string }>;
 }
 
 const SLOW_MS = 5_000;
@@ -37,7 +39,7 @@ const SLOW_MS = 5_000;
 // down. The load unit waits longer, because timing slow requests is its job.
 const READ_PATIENCE_MS = 1_500;
 
-function path(url: string): string {
+export function path(url: string): string {
   try {
     const u = new URL(url);
     return u.pathname + u.search;
@@ -208,6 +210,8 @@ function passiveCandidates(
 // ---------------------------------------------------------------------------
 
 export type LoadResult = UnitResult & {
+  /** The words the product uses about itself, for the understanding pass. */
+  labels: string[];
   status: number | null;
   finalUrl: string;
   leftTheSite: string | null;
@@ -230,6 +234,8 @@ export async function loadUnit(
     candidates: [],
     discovered: [],
     notes: [],
+    refusedLinks: [],
+    labels: [],
     status,
     finalUrl,
     leftTheSite: null,
@@ -284,6 +290,8 @@ export async function loadUnit(
   }
 
   if (status !== null && status >= 400) return result;
+
+  result.labels = await s.eval<string[]>(js.READ_LABELS).catch(() => []);
 
   result.candidates.push(...passiveCandidates(s, s.since(mark), url, unit, steps));
 
@@ -346,6 +354,10 @@ export async function loadUnit(
     if (!sameOrigin(clean, s.opts.target)) continue;
     if (assess({ name: link.text, role: "link", target: clean }).risk === "destructive") {
       result.notes.push(`Not following "${link.text}" (${path(clean)}): it looks like it acts on visit.`);
+      // Refused, but remembered: signing out is the one of these Owly needs to
+      // know about, and it is tested deliberately at the end rather than
+      // stumbled into in the middle of a crawl.
+      result.refusedLinks.push({ url: clean, via: link.text });
       continue;
     }
     result.discovered.push({ url: clean, from: url, via: link.text });
@@ -369,7 +381,7 @@ const IMPACT: Record<string, Severity> = { critical: "high", serious: "medium", 
 /** An automated accessibility scan. Limited by nature, and labelled so. */
 export async function a11yUnit(s: Session, url: string): Promise<UnitResult> {
   const unit = unitKey(s.opts.persona.key, "a11y", url);
-  const result: UnitResult = { candidates: [], discovered: [], notes: [] };
+  const result: UnitResult = { candidates: [], discovered: [], notes: [], refusedLinks: [] };
   const status = await s.goto(url, READ_PATIENCE_MS);
   if (status !== null && status >= 400) return result;
 
@@ -410,7 +422,7 @@ export async function a11yUnit(s: Session, url: string): Promise<UnitResult> {
 /** Layout at this persona's viewport: overflow, clipping, overlaps, covered controls. */
 export async function layoutUnit(s: Session, url: string): Promise<UnitResult> {
   const unit = unitKey(s.opts.persona.key, "layout", url);
-  const result: UnitResult = { candidates: [], discovered: [], notes: [] };
+  const result: UnitResult = { candidates: [], discovered: [], notes: [], refusedLinks: [] };
   const status = await s.goto(url, READ_PATIENCE_MS);
   if (status !== null && status >= 400) return result;
 
@@ -528,7 +540,7 @@ export async function layoutUnit(s: Session, url: string): Promise<UnitResult> {
 /** Press each standalone button and watch what breaks. */
 export async function buttonsUnit(s: Session, url: string, maxButtons = 8): Promise<UnitResult> {
   const unit = unitKey(s.opts.persona.key, "buttons", url);
-  const result: UnitResult = { candidates: [], discovered: [], notes: [] };
+  const result: UnitResult = { candidates: [], discovered: [], notes: [], refusedLinks: [] };
   const status = await s.goto(url, READ_PATIENCE_MS);
   if (status !== null && status >= 400) return result;
 
@@ -565,7 +577,7 @@ export async function buttonsUnit(s: Session, url: string, maxButtons = 8): Prom
 
 // ---------------------------------------------------------------------------
 
-interface FormInfo {
+export interface FormInfo {
   index: number;
   action: string;
   method: string;
@@ -591,18 +603,35 @@ interface Attempt {
  */
 const INTERACT_MS = 10_000;
 
-async function fillAndSubmit(
+export interface FillOptions {
+  /** Put this in every email field instead of a valid address. */
+  emailOverride?: string;
+  /**
+   * Replace the value for one field. Returning undefined leaves the field to
+   * the ordinary synthetic value, so a caller can change exactly one thing
+   * about an otherwise normal submission and know that is what it changed.
+   */
+  override?: (field: FieldInfo & { key: string }) => FillValue | null | undefined;
+}
+
+export async function fillAndSubmit(
   s: Session,
   url: string,
   form: FormInfo,
-  emailOverride?: string,
+  opts: FillOptions = {},
 ): Promise<(Attempt & { problems: string[] }) | null> {
   await s.goto(url, READ_PATIENCE_MS);
   await s.eval(js.LIST_FORMS);
   const n = nonce();
   const problems: string[] = [];
   for (const field of form.fields) {
-    const value = emailOverride !== undefined && isEmailField(field) ? { kind: "text" as const, value: emailOverride } : valueFor(field, n);
+    const chosen = opts.override?.(field);
+    const value =
+      chosen !== undefined
+        ? chosen
+        : opts.emailOverride !== undefined && isEmailField(field)
+          ? { kind: "text" as const, value: opts.emailOverride }
+          : valueFor(field, n);
     if (!value) continue;
     const loc = s.page.locator(`[data-owly-field="${field.key}"]`);
     try {
@@ -650,7 +679,7 @@ const isMutation = (r: NetRecord) => r.method !== "GET" && r.method !== "HEAD";
 /** Fill and submit each form the way a user would, then the way a careless one would. */
 export async function formsUnit(s: Session, url: string, maxForms = 3): Promise<UnitResult> {
   const unit = unitKey(s.opts.persona.key, "forms", url);
-  const result: UnitResult = { candidates: [], discovered: [], notes: [] };
+  const result: UnitResult = { candidates: [], discovered: [], notes: [], refusedLinks: [] };
   const status = await s.goto(url, READ_PATIENCE_MS);
   if (status !== null && status >= 400) return result;
 
@@ -698,6 +727,50 @@ export async function formsUnit(s: Session, url: string, maxForms = 3): Promise<
       for (let i = 0; i < 2; i++) {
         const again = await fillAndSubmit(s, url, form);
         if (again) attempts.push(again);
+      }
+    }
+
+    // --- the impatient double press ---------------------------------------
+    // A person who is not sure the first click registered clicks again. An app
+    // that takes both creates two of whatever it creates, and the second one
+    // is a support ticket. Only for forms that make something, only when the
+    // first submission worked, and never for signing in, where pressing twice
+    // is harmless.
+    if (
+      firstSucceeded &&
+      /\b(create|add|new|book|order|save|post|upload|submit)\b/i.test(submitName) &&
+      !/\b(sign|log)\s?in\b/i.test(submitName)
+    ) {
+      const twice = await submitTwiceQuickly(s, url, form);
+      // Two accepted requests are not two records. A signup form that takes a
+      // second press has not necessarily made a second account, and saying so
+      // would be a guess - it was a false positive on the control app the
+      // first time this ran. The claim is only made when the thing Owly typed
+      // is visibly there twice afterwards.
+      if (twice && twice.accepted.length > 1 && twice.copies > 1) {
+        result.candidates.push({
+          kind: "duplicate_on_double_submit",
+          title: `Pressing "${submitName}" twice on ${path(url)} submits it twice`,
+          severity: "medium",
+          url,
+          target: submitName,
+          persona,
+          summary: `Two quick presses sent ${twice.accepted.length} identical requests, the server accepted both, and what Owly typed then appeared ${twice.copies} times.`,
+          expected:
+            "A second press while the first is still going is ignored - the button is disabled, or the server refuses the repeat.",
+          actual: twice.accepted.map((r) => `${r.method} ${path(r.url)} -> ${r.status}`).join(", "),
+          steps: [...baseSteps.slice(0, 2), `Press "${submitName}" twice, quickly`],
+          evidence: twice.accepted.slice(0, 3).map(netEvidence),
+          observed: [
+            `${twice.accepted.length} identical requests were accepted`,
+            ...twice.accepted.slice(0, 3).map((r) => `${r.method} ${r.url} -> ${r.status}`),
+            `"${twice.marker}" appears ${twice.copies} times on ${path(twice.landedOn)} afterwards`,
+          ],
+          inference: ["An impatient user ends up with two of whatever this form makes."],
+          deterministic: true,
+          fingerprint: `double_submit|${new URL(url).pathname}|${submitName}`,
+          unit,
+        });
       }
     }
 
@@ -794,7 +867,7 @@ export async function formsUnit(s: Session, url: string, maxForms = 3): Promise<
     // --- the careless user: an obviously invalid email ---------------------
     const emailField = form.fields.find(isEmailField);
     if (emailField) {
-      const bad = await fillAndSubmit(s, url, form, INVALID_EMAIL);
+      const bad = await fillAndSubmit(s, url, form, { emailOverride: INVALID_EMAIL });
       if (bad) {
         // Proof, not suspicion: a request that carried the invalid value, and a
         // server that said yes to it.
@@ -853,7 +926,7 @@ export async function keyboardUnit(
   opts: { pressButtons: boolean } = { pressButtons: true },
 ): Promise<UnitResult> {
   const unit = unitKey(s.opts.persona.key, "keyboard", url);
-  const result: UnitResult = { candidates: [], discovered: [], notes: [] };
+  const result: UnitResult = { candidates: [], discovered: [], notes: [], refusedLinks: [] };
   const status = await s.goto(url, READ_PATIENCE_MS);
   if (status !== null && status >= 400) return result;
   const persona = s.opts.persona.key;
@@ -977,6 +1050,83 @@ function reachableButtons_(visited: FocusRead[]): string {
   return names.length ? names.join(", ") : "none";
 }
 
+
+/**
+ * Fill the form and press submit twice, as fast as a person does when nothing
+ * seems to have happened. Returns the identical mutating requests the server
+ * accepted.
+ */
+async function submitTwiceQuickly(
+  s: Session,
+  url: string,
+  form: FormInfo,
+): Promise<{ accepted: NetRecord[]; copies: number; marker: string; landedOn: string } | null> {
+  await s.goto(url, READ_PATIENCE_MS);
+  const forms = await s.eval<FormInfo[]>(js.LIST_FORMS);
+  const again = forms[form.index];
+  if (!again || !again.submit) return null;
+
+  const n = nonce();
+  // The first text Owly types is the marker it looks for afterwards: if the
+  // form made two of something, this is what is sitting there twice.
+  let marker = "";
+  for (const field of again.fields) {
+    const value = valueFor(field, n);
+    if (!value) continue;
+    if (!marker && value.kind === "text" && value.value.length > 6 && !isEmailField(field)) marker = value.value;
+    const loc = s.page.locator(`[data-owly-field="${field.key}"]`);
+    try {
+      if (value.kind === "select") await loc.selectOption(value.value, { timeout: INTERACT_MS });
+      else if (value.kind === "check") await loc.check({ timeout: INTERACT_MS });
+      else await loc.fill(value.value, { timeout: INTERACT_MS });
+    } catch {
+      return null; // a form Owly could not fill says nothing about double presses
+    }
+  }
+
+  const mark = s.mark();
+  // Both presses in the same tick, which is what a double-click is. Clicking
+  // twice through the driver does not reproduce it: the first press starts a
+  // navigation and the button is gone before the second arrives, so a classic
+  // form always looked safe while a real double-click still made two.
+  //
+  // The call itself usually throws - the first press destroys the context the
+  // evaluation was running in - and that is not a failure: both clicks have
+  // already happened by then. What the server did with them is in the network
+  // record either way.
+  await s
+    .eval(`(() => { var b = document.querySelector('[data-owly-submit="${form.index}"]'); if (b) { b.click(); b.click(); } })()`)
+    .catch(() => undefined);
+  await s.settle(READ_PATIENCE_MS);
+
+  const accepted = s
+    .since(mark)
+    .net.filter(isMutation)
+    .filter((r) => r.status !== null && r.status >= 200 && r.status < 400);
+  const landedOn = s.page.url();
+  const first = accepted[0];
+  if (!first) return { accepted: [], copies: 0, marker, landedOn };
+
+  // How many times the typed value is on the page Owly ended up on. Two is the
+  // evidence that two records exist; anything else and no claim is made.
+  let copies = 0;
+  if (marker) {
+    copies = await s
+      .eval<number>(`(() => { var t = document.body ? document.body.innerText : ""; var n = 0, i = 0;` +
+        ` var m = ${JSON.stringify(marker)}; while ((i = t.indexOf(m, i)) !== -1) { n++; i += m.length; } return n; })()`)
+      .catch(() => 0);
+  }
+
+  // Only identical requests count: a second press that sent something else was
+  // a different action, not a duplicate.
+  return {
+    accepted: accepted.filter((r) => r.method === first.method && r.url === first.url && r.postData === first.postData),
+    copies,
+    marker,
+    landedOn,
+  };
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -995,7 +1145,7 @@ function reachableButtons_(visited: FocusRead[]): string {
  */
 export async function persistUnit(s: Session, url: string, maxForms = 2): Promise<UnitResult> {
   const unit = unitKey(s.opts.persona.key, "persist", url);
-  const result: UnitResult = { candidates: [], discovered: [], notes: [] };
+  const result: UnitResult = { candidates: [], discovered: [], notes: [], refusedLinks: [] };
 
   await s.goto(url, READ_PATIENCE_MS);
   const forms = await s.eval<FormInfo[]>(js.LIST_FORMS);

@@ -16,7 +16,7 @@
 import type { InputSchema } from "./params.js";
 
 export const PROTOCOL_VERSION = "1.0";
-export const AGENT_VERSION = "2026.09.17";
+export const AGENT_VERSION = "2026.09.20";
 export const MAX_REQUEST_BYTES = 262_144;
 
 export const FOCUS = ["everything", "forms", "mobile", "accessibility"] as const;

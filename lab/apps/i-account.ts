@@ -1,4 +1,4 @@
-import { formValue, html, page, redirect, type Ctx, type LabApp } from "../kit.js";
+import { formValue, html, json, jsonBody, page, redirect, type Ctx, type LabApp } from "../kit.js";
 
 // App I - the product behind a login.
 //
@@ -153,13 +153,36 @@ export const app: LabApp = {
         ctx,
         "New ticket - Tickly",
         `<h1>New ticket</h1>
-         <form method="post" action="/app/new">
+         <form id="new-ticket">
            <label for="title">Title</label>
            <input id="title" name="title" type="text" required>
            <label for="details">Details</label>
            <textarea id="details" name="details" rows="4"></textarea>
            <button type="submit">Create ticket</button>
-         </form>`,
+         </form>
+         <p id="said" class="notice" hidden></p>
+         <script>
+           var form = document.getElementById("new-ticket");
+           form.addEventListener("submit", function (e) {
+             e.preventDefault();
+             // No guard of any kind: the button stays live and every press
+             // sends another ticket. This is the planted bug (I2).
+             fetch("/app/new", {
+               method: "POST",
+               headers: { "content-type": "application/json" },
+               body: JSON.stringify({
+                 title: document.getElementById("title").value,
+                 details: document.getElementById("details").value
+               })
+             }).then(function (r) {
+               if (r.ok) { window.location.href = "/app"; return; }
+               var said = document.getElementById("said");
+               said.hidden = false;
+               said.className = "notice err";
+               said.textContent = "Something went wrong.";
+             });
+           });
+         </script>`,
         true,
       );
     },
@@ -169,7 +192,8 @@ export const app: LabApp = {
     "POST /app/new": (ctx) => {
       const me = who(ctx);
       if (!me) return redirect(ctx, "/signin");
-      const title = formValue(ctx.body, "title").trim() || "Untitled";
+      const sent = jsonBody<{ title?: string }>(ctx.body);
+      const title = (sent?.title ?? formValue(ctx.body, "title")).trim() || "Untitled";
       if (title.length > 60) {
         ctx.hit("crash");
         html(ctx, page("Error", `<main><h1>Something went wrong</h1><p>RangeError: title index out of range</p></main>`), 500);
@@ -177,6 +201,7 @@ export const app: LabApp = {
       }
       me.tickets.push({ id: nextId++, title });
       ctx.hit("created");
+      if (sent) return json(ctx, { ok: true, id: nextId - 1 });
       redirect(ctx, "/app");
     },
 

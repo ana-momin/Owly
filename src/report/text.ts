@@ -119,6 +119,12 @@ export function pondMarkdown(report: RunReport, reportUrl: string | null, limit 
     lines.push("", `### ${v.headline}`, v.detail);
   }
 
+  // What Owly took the product to be. Said before the findings, because if it
+  // read the product wrongly the findings below are about something else.
+  if (report.understanding?.reads_as) {
+    lines.push("", `_${report.understanding.reads_as}._`);
+  }
+
   lines.push("");
   lines.push(
     `${report.mode === "full" ? "Full test" : "Passive scan"} · focus: ${FOCUS_LABEL[report.focus]} · ${ok} page${ok === 1 ? "" : "s"} · ${counts(report.findings)} · ${duration(report.durationMs)}`,

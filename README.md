@@ -126,11 +126,17 @@ which Owly cannot reach yet.
 The benchmark fails the build if the control app produces a finding or a safety
 rule is broken.
 
-Current score: **20 of 26** planted defects found, **100%** precision, **0**
-false positives on the control app, **0** safety violations. Of the six not
-found: three need judgement a model would have to make, and three are behind
-the login and waiting on checks being built now (double submit, boundary
-values, sign-out).
+Current score: **23 of 26** planted defects found - **every one that can be
+found without judgement**, 23 of 23 - at **100%** precision, **0** false
+positives on the control app, **0** safety violations. The three not found all
+need a model: two are about whether wording is clear, one about whether a
+number looks stale.
+
+`truth.json` also has an `alsoTrue` list: things genuinely wrong with the lab
+apps that were never planted as puzzles, such as the missing security headers
+on every app but the control. Reporting those is correct, so they count as
+precise, but they are kept out of recall - the headline number scores only the
+bugs built by hand.
 
 ## Known and deliberate
 

@@ -123,3 +123,25 @@ describe("checking that a change actually stuck", () => {
     expect(report.findings.some((f) => f.kind === "lost_write")).toBe(false);
   }, 400_000);
 });
+
+/**
+ * The impatient second click.
+ *
+ * App I creates a ticket per submission with nothing stopping the second one,
+ * which is how a support queue ends up with everything in it twice.
+ */
+describe("pressing the button twice", () => {
+  it("is reported when the app accepts both presses", async () => {
+    const report = await runTest(appUrl("i"), { allowPrivate: true });
+    const dup = report.findings.find((f) => f.kind === "duplicate_on_double_submit");
+
+    expect(dup, `findings were: ${report.findings.map((f) => f.kind).join(", ") || "none"}`).toBeDefined();
+    expect(dup!.title).toMatch(/twice/i);
+    expect(dup!.evidence.filter((e) => e.type === "network").length).toBeGreaterThanOrEqual(2);
+  }, 400_000);
+
+  it("is not reported about an app that only takes the first press", async () => {
+    const report = await runTest(appUrl("g"), { allowPrivate: true });
+    expect(report.findings.some((f) => f.kind === "duplicate_on_double_submit")).toBe(false);
+  }, 400_000);
+});

@@ -61,6 +61,12 @@ if (s.unplanned.length) {
   console.log("\n  UNPLANNED (on apps that are broken anyway - may be real, check)");
   for (const f of s.unplanned) console.log(`    ${f.kind.padEnd(22)} ${f.confidence.padEnd(10)} ${f.title}`);
 }
+if (s.expected.length) {
+  console.log(`\n  CORRECT BUT NOT PLANTED (${s.expected.length} - true of these apps, listed in truth.json under alsoTrue)`);
+  const byKind = new Map<string, number>();
+  for (const f of s.expected) byKind.set(f.kind, (byKind.get(f.kind) ?? 0) + 1);
+  for (const [kind, n] of byKind) console.log(`    ${kind.padEnd(22)} on ${n} app${n === 1 ? "" : "s"}`);
+}
 if (s.duplicates.length) {
   console.log("\n  DUPLICATES");
   for (const f of s.duplicates) console.log(`    ${f.kind.padEnd(22)} ${f.title}`);

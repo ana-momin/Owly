@@ -344,6 +344,7 @@ export const LIST_FORMS = `(() => {
         required: !!el.required,
         min: el.getAttribute("min"),
         max: el.getAttribute("max"),
+        maxLength: el.maxLength > 0 ? el.maxLength : null,
         options: options
       });
     }
@@ -393,5 +394,28 @@ export const LIST_LOOSE_BUTTONS = `(() => {
     el.setAttribute("data-owly-btn", key);
     out.push({ key: key, name: owlyName(el) || owlyDescribe(el), role: "button" });
   }
+  return out;
+})()`;
+
+/**
+ * The words this product uses about itself: navigation, headings, the names of
+ * its controls and fields. Not for a check - for working out what the thing
+ * is, so the report can say so and be corrected if it is wrong.
+ */
+export const READ_LABELS = `(() => {
+  ${HELPERS}
+  var out = [];
+  var push = function (text) {
+    var t = (text || "").replace(/\s+/g, " ").trim();
+    if (t && t.length <= 40) out.push(t);
+  };
+  var nav = document.querySelectorAll("nav a, header a, [role=navigation] a, aside a");
+  for (var i = 0; i < nav.length && i < 40; i++) push(nav[i].textContent);
+  var heads = document.querySelectorAll("h1, h2, h3, [role=heading]");
+  for (var j = 0; j < heads.length && j < 25; j++) push(heads[j].textContent);
+  var controls = document.querySelectorAll("button, [role=button], a.btn, input[type=submit]");
+  for (var k = 0; k < controls.length && k < 25; k++) push(owlyName(controls[k]));
+  var fields = document.querySelectorAll("input, select, textarea");
+  for (var m = 0; m < fields.length && m < 25; m++) push(owlyName(fields[m]));
   return out;
 })()`;

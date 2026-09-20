@@ -27,7 +27,10 @@ import { launchBrowser, PERSONAS, Session, type BlockRecord, type Persona, type 
 import { parseUnit, unitKey, type Activity, type Candidate } from "./candidate.js";
 import { cluster, replayKey } from "./cluster.js";
 import { a11yUnit, buttonsUnit, formsUnit, keyboardUnit, layoutUnit, loadUnit, persistUnit, type UnitResult } from "./probes.js";
+import { boundaryUnit } from "./boundary.js";
 import { runJourney, type Journey } from "./journey.js";
+import { accessChecks, cookieChecks, headerChecks, signOutCheck } from "./security.js";
+import { costOf, understand, type Understanding } from "./understanding.js";
 // The pure half: what a run may check and the state it starts from. Kept in
 // its own file so the endpoints that only create or read runs never pull a
 // browser into their bundle.
@@ -56,6 +59,7 @@ type WorkItem = (
   | { kind: "discover"; url: string; from: string | null; via: string }
   | { kind: "unit"; persona: Persona["key"]; activity: Activity; url: string }
   | { kind: "replay"; unit: string }
+  | { kind: "security" }
 ) & {
   /** Failed attempts so far. One retry, then the item is skipped and noted. */
   tries?: number;
@@ -76,8 +80,10 @@ const ACTIVITY_LABEL: Record<Activity, string> = {
   layout: "the layout check",
   buttons: "pressing buttons",
   forms: "filling in forms",
+  boundary: "trying an unusually long value",
   keyboard: "the keyboard check",
   persist: "checking that changes are saved",
+  security: "the security checks",
 };
 
 type Outcome<T> = { ok: true; value: T } | { ok: false; reason: "timeout" | "error"; error: string; stopSlice: boolean };
@@ -111,6 +117,8 @@ export interface RunReport {
   events: RunEvent[];
   /** How Owly got in, when it did: the report says so plainly. */
   signedInBy: string | null;
+  /** What Owly made of the product it was testing. */
+  understanding: Understanding;
 
   /** The attempt at the site's main task. The report leads with it. */
   journey: Journey | null;
@@ -151,6 +159,19 @@ export interface RunState {
   auth: StorageState | null;
   /** How Owly got in, for the report. */
   signedInBy: string | null;
+  /** Pages that were only reachable once signed in. The access check uses these. */
+  behindLogin: string[];
+  /** The words this product uses about itself. What the understanding is built from. */
+  labels: string[];
+  /** The way out, if the product offers one. Followed last, on purpose. */
+  signOutUrl: string | null;
+  /**
+   * Who Owly said it was when it signed up: the email and name it typed, never
+   * the password. A page printing one of these back is proof that the page
+   * belongs to Owly's own account, which is the difference between a security
+   * finding and a guess. Redacted out of the report like any other value.
+   */
+  identity: string[];
   journey: Journey | null;
   createdAt: string;
   elapsedMs: number;
@@ -268,6 +289,7 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
             emit(state, "info", `Trying ${ok.length} page${ok.length === 1 ? "" : "s"} with only a keyboard`);
             for (const url of ok) state.pending.push({ kind: "unit", persona: "keyboard_only", activity: "keyboard", url });
           }
+          if (allowed.has("security")) state.pending.push({ kind: "security" });
           state.phase = "personas";
           continue;
         }
@@ -307,6 +329,36 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
           applyJourney(state, outcome.value);
           await keepTheSession(state, await shared("new_user"), outcome.value);
         }
+        continue;
+      }
+
+      if (item.kind === "security") {
+        emit(state, "info", "Checking the things that should not be possible");
+        const outcome = await attempt(async () => {
+          // Twice, in two fresh browsers, because a security claim carries the
+          // same burden of proof as every other finding here.
+          const once = async () =>
+            runSecurity(await getBrowser(), sessionOpts(PERSONAS.new_user), state);
+          const first = await once();
+          const second = await once();
+          const confirmed = first.candidates.filter((c) =>
+            second.candidates.some((other) => other.fingerprint === c.fingerprint),
+          );
+          return { confirmed, notes: [...first.notes, ...second.notes] };
+        });
+        if (!outcome.ok) {
+          retryOrSkip(item, "the security checks", outcome);
+          if (outcome.stopSlice) break;
+          continue;
+        }
+        for (const c of outcome.value.confirmed) {
+          state.candidates.push(c);
+          // Seen in both browsers: recorded as reproduced rather than replayed
+          // again later, because signing out cannot be undone.
+          state.reproduced.push(replayKey(c));
+          emit(state, "suspect", `Possible issue: ${c.title}`);
+        }
+        state.notes.push(...new Set(outcome.value.notes));
         continue;
       }
 
@@ -366,12 +418,21 @@ export async function advance(state: RunState, opts: AdvanceOptions): Promise<Ru
           emit(state, "warn", `${new URL(url).pathname} answered HTTP ${loaded.status}`);
           continue;
         }
+        if (state.auth && !state.behindLogin.includes(url)) state.behindLogin.push(url);
+        for (const label of loaded.labels) {
+          if (state.labels.length < 200 && !state.labels.includes(label)) state.labels.push(label);
+        }
+        for (const found of [...loaded.discovered, ...loaded.refusedLinks]) {
+          if (!state.signOutUrl && /\b(sign|log)\s?out\b/i.test(found.via) && sameOrigin(found.url, target)) {
+            state.signOutUrl = found.url;
+          }
+        }
         take(loaded);
         // Finish this page before moving to the next one.
         const units: WorkItem[] = [];
         // "Did it save?" only applies to a product Owly is signed into, where
         // the thing being edited belongs to the account it created itself.
-        for (const activity of ["a11y", "layout", "buttons", "forms", ...(state.auth ? (["persist"] as const) : [])] as const) {
+        for (const activity of ["a11y", "layout", "buttons", "forms", "boundary", ...(state.auth ? (["persist"] as const) : [])] as const) {
           if (allowed.has(activity) && !(activity === "layout" && state.focus === "mobile")) {
             units.push({ kind: "unit", persona: "new_user", activity, url });
           }
@@ -468,8 +529,10 @@ async function runUnit(s: Session, activity: Activity, url: string, mode: Mode):
       return keyboardUnit(s, url, { pressButtons: mode === "full" });
     case "persist":
       return persistUnit(s, url);
+    case "boundary":
+      return boundaryUnit(s, url);
     default:
-      return { candidates: [], discovered: [], notes: [] };
+      return { candidates: [], discovered: [], notes: [], refusedLinks: [] };
   }
 }
 
@@ -553,6 +616,7 @@ async function keepTheSession(state: RunState, s: Session, journey: Journey): Pr
   if (!held || (cookies === 0 && stored === 0)) return;
 
   state.auth = held;
+  state.identity = (journey.identity ?? []).filter((v) => v.length >= 4);
   state.signedInBy = journey.entry ? `following "${journey.entry}"` : "the main journey";
   emit(state, "info", `Signed in ${state.signedInBy} - testing what is behind it`);
 
@@ -616,6 +680,18 @@ function finish(state: RunState, pages: Map<string, number | null>, sliceStart: 
   state.elapsedMs += Date.now() - sliceStart;
   emit(state, "info", `Done: ${findings.length} issue${findings.length === 1 ? "" : "s"} found on ${okCount} page${okCount === 1 ? "" : "s"}`);
 
+  // What Owly made of the product, said out loud so a wrong reading is
+  // visible rather than buried in the findings underneath it.
+  const understanding = understand({
+    target: state.target,
+    labels: state.labels,
+    journey: state.journey,
+    signedInBy: state.signedInBy,
+    behindLogin: state.behindLogin,
+  });
+  // Ranked by what a failure costs this product, not by which checker found it.
+  findings.sort((a, b) => costOf(a, understanding) - costOf(b, understanding));
+
   const redact = createRedactor();
   state.report = redact.value<RunReport>({
     target: state.target,
@@ -633,6 +709,7 @@ function finish(state: RunState, pages: Map<string, number | null>, sliceStart: 
     events: state.events,
     journey: state.journey,
     signedInBy: state.signedInBy,
+    understanding,
     failed,
   });
   state.phase = "done";
@@ -641,3 +718,78 @@ function finish(state: RunState, pages: Map<string, number | null>, sliceStart: 
   state.candidates = [];
   state.pending = [];
 }
+
+/**
+ * One security pass, in browsers of its own.
+ *
+ * Fresh contexts every time: the access check needs a browser that has never
+ * signed in, and the sign-out check needs one that can be thrown away
+ * afterwards, because signing out is not something you can undo and take back.
+ */
+async function runSecurity(
+  browser: Browser,
+  opts: ReturnType<typeof sessionOptsShape>,
+  state: RunState,
+): Promise<{ candidates: Candidate[]; notes: string[] }> {
+  const candidates: Candidate[] = [];
+  const notes: string[] = [];
+  let confirmedPrivate: string[] = [];
+
+  // 1. What the server says about itself, read from a page load of its own.
+  const plain = await Session.open(browser, { ...opts, signedInAs: null });
+  try {
+    await plain.goto(state.target);
+    const headers = headerChecks(plain.net, state.target, plain.opts.persona.key);
+    candidates.push(...headers.candidates);
+    notes.push(...headers.notes);
+
+    // 2. Pages that needed an account, asked for without one. This also tells
+    //    us which of them are private for real, rather than merely pages the
+    //    crawl happened to see after signing in.
+    if (state.behindLogin.length) {
+      const access = await accessChecks(plain, state.target, state.behindLogin, state.identity);
+      candidates.push(...access.candidates);
+      notes.push(...access.notes);
+      confirmedPrivate = access.confirmed;
+    }
+  } finally {
+    await within(plain.close(), 5_000);
+  }
+
+  if (!state.auth) return { candidates, notes };
+
+  // 3. The cookie that keeps the session, and 4. whether signing out ends it.
+  const signedIn = await Session.open(browser, { ...opts, signedInAs: state.auth });
+  try {
+    const cookies = await cookieChecks(signedIn, state.target);
+    candidates.push(...cookies.candidates);
+    notes.push(...cookies.notes);
+
+    // Re-open a page that a session-less browser was actually refused. Using
+    // just "the first page seen while signed in" picked the home page, which
+    // looks fine to everyone and so proved nothing either way.
+    const privatePage = confirmedPrivate[0];
+    if (state.signOutUrl && privatePage && state.identity.length) {
+      const out = await signOutCheck(signedIn, state.target, state.signOutUrl, privatePage, state.identity);
+      candidates.push(...out.candidates);
+      notes.push(...out.notes);
+    } else if (privatePage && !state.signOutUrl) {
+      notes.push("No sign-out link was found, so whether signing out works was not tested.");
+    } else if (state.signOutUrl && !privatePage) {
+      notes.push("No page turned out to need an account, so whether signing out works could not be tested.");
+    }
+  } finally {
+    await within(signedIn.close(), 5_000);
+  }
+
+  return { candidates, notes };
+}
+
+/** Only for the type of the options object the machine builds per persona. */
+declare function sessionOptsShape(persona: Persona): {
+  target: URL;
+  persona: Persona;
+  allowPrivate: boolean;
+  userAgentSuffix: string;
+  signedInAs: StorageState | null;
+};

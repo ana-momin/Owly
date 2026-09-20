@@ -12,7 +12,7 @@
  *     `confidenceFrom` rather than asserted by the detector that raised it.
  */
 
-export type Category = "functional" | "usability" | "visual" | "accessibility" | "reliability";
+export type Category = "functional" | "usability" | "visual" | "accessibility" | "reliability" | "security";
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type Confidence = "confirmed" | "likely" | "possible" | "inconclusive";
 
@@ -28,6 +28,16 @@ export type FindingKind =
   | "form_no_feedback"
   /** Accepted a change and then lost it: the old value is back after a reload. */
   | "lost_write"
+  /** Pressing submit twice quickly sent the form twice, and both were accepted. */
+  | "duplicate_on_double_submit"
+  /** Headers a browser needs to protect people, absent everywhere. */
+  | "security_headers"
+  /** The cookie that keeps you signed in is readable by scripts, or unencrypted. */
+  | "weak_session_cookie"
+  /** A page that needs an account answered a browser that has none. */
+  | "unprotected_page"
+  /** Signing out left the session working. */
+  | "signout_ineffective"
   | "form_accepts_invalid"
   | "action_obscured"
   | "dead_end"
@@ -50,6 +60,11 @@ export const CATEGORY_OF: Record<FindingKind, Category> = {
   form_server_error: "functional",
   form_no_feedback: "usability",
   lost_write: "functional",
+  duplicate_on_double_submit: "functional",
+  security_headers: "security",
+  weak_session_cookie: "security",
+  unprotected_page: "security",
+  signout_ineffective: "security",
   form_accepts_invalid: "functional",
   action_obscured: "usability",
   dead_end: "usability",

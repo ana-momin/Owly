@@ -1,4 +1,4 @@
-import { html, json, page, jsonBody, redirect, type LabApp } from "../kit.js";
+import { html, json, page, jsonBody, redirect, type Handler, type LabApp } from "../kit.js";
 
 // App G - the control. NOTHING is wrong here, on purpose.
 //
@@ -18,11 +18,35 @@ import { html, json, page, jsonBody, redirect, type LabApp } from "../kit.js";
 const nav = `<header><nav aria-label="Main"><a href="/">Ledgerly</a> <a href="/pricing">Pricing</a> <a href="/contact">Contact</a></nav></header>`;
 const foot = `<footer><p>Made in Lahore. <a href="https://example.com/">Our partner</a> · <a href="/partner">Partner sign-in</a> · <a href="/status.json">Service status</a></p></footer>`;
 
+/**
+ * The control app is the one thing in the lab that is correct in every way we
+ * check, and that now includes what it tells the browser about itself. Without
+ * these, Owly's security pass would report a missing Content-Security-Policy
+ * here - a true statement about a deliberately perfect app, which is exactly
+ * the false positive this app exists to catch.
+ */
+function guarded(routes: Record<string, Handler>): Record<string, Handler> {
+  const out: Record<string, Handler> = {};
+  for (const [route, handler] of Object.entries(routes)) {
+    out[route] = (ctx) => {
+      ctx.res.setHeader(
+        "content-security-policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
+      );
+      ctx.res.setHeader("x-content-type-options", "nosniff");
+      ctx.res.setHeader("x-frame-options", "DENY");
+      ctx.res.setHeader("referrer-policy", "no-referrer");
+      return handler(ctx);
+    };
+  }
+  return out;
+}
+
 export const app: LabApp = {
   key: "g",
   name: "Clean control",
   port: 4107,
-  routes: {
+  routes: guarded({
     "GET /": (ctx) =>
       html(ctx, page("Ledgerly - simple bookkeeping", `${nav}
         <main>
@@ -150,7 +174,7 @@ export const app: LabApp = {
       if (!String(d.email ?? "").includes("@") || !d.username) return json(ctx, { error: "invalid" }, 422);
       json(ctx, { ok: true }, 201);
     },
-  },
+  }),
 };
 
 // Dynamic route handled in the server: GET /api/users/:name -> 404 unless "taken".

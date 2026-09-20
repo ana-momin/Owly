@@ -107,7 +107,7 @@ DNS TXT   owly-verification=owly-...</pre>
     <p>Anything that needs judgement: a confusing label, an unhelpful error message, a total that is wrong but renders perfectly. Owly says so rather than guessing &mdash; its own benchmark counts those as misses.</p>
 
     <h2>How good is it, actually</h2>
-    <p>Owly is scored against a lab of deliberately broken apps plus one control app with nothing wrong at all. Current score: <strong>20 of 26</strong> planted defects found, <strong>100% precision</strong>, <strong>zero</strong> false positives on the control app, <strong>zero</strong> safety-rule violations. The build fails if any of those slip. The six it misses are listed in the open, not hidden: three need judgement, three are checks being built now.</p>
+    <p>Owly is scored against a lab of deliberately broken apps plus one control app with nothing wrong at all. Current score: <strong>23 of 26</strong> planted defects found &mdash; every one that can be found without judgement &mdash; at <strong>100% precision</strong>, <strong>zero</strong> false positives on the control app, <strong>zero</strong> safety-rule violations. The build fails if any of those slip. The three it misses are listed in the open, not hidden: all three need a judgement call a model would have to make.</p>
 
     <h2>And when it cannot reach you</h2>
     <p>A run where no page opened says exactly that. It is never presented as a clean bill of health, and it is not counted against your free tests.</p>

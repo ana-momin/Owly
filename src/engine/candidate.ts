@@ -10,7 +10,18 @@
 import type { Evidence, FindingKind, Reproduction, Severity, Viewport } from "../findings.js";
 import type { Persona } from "../browser/session.js";
 
-export type Activity = "journey" | "load" | "layout" | "a11y" | "forms" | "buttons" | "keyboard" | "links" | "persist";
+export type Activity =
+  | "journey"
+  | "load"
+  | "layout"
+  | "a11y"
+  | "forms"
+  | "buttons"
+  | "keyboard"
+  | "links"
+  | "persist"
+  | "boundary"
+  | "security";
 
 export interface Candidate {
   kind: FindingKind;

@@ -67,6 +67,8 @@ export interface NetRecord {
   /** True when Owly's guard refused it - never a site failure. */
   blockedByOwly: boolean;
   isNavigation: boolean;
+  /** Response headers, for same-origin documents only. Used by the security checks. */
+  headers?: Record<string, string>;
 }
 
 export interface ConsoleRecord {
@@ -264,11 +266,29 @@ export class Session {
       record.durationMs = Date.now() - record.startedAt;
       record.blockedByOwly = this.refused.has(request);
       const response = await request.response().catch(() => null);
-      record.status = response?.status() ?? null;
+      // Keep whatever the response listener already saw: by the time a request
+      // finishes, a page that navigates on success has thrown its response
+      // away, and the record would say the outcome was unknown. That is how a
+      // form which posts and then redirects looked like it had never answered.
+      record.status = record.status ?? response?.status() ?? null;
       const type = request.resourceType();
+      if (response && type === "document" && sameOrigin(request.url(), opts.target)) {
+        record.headers = response.headers();
+      }
       if (response && (type === "document" || type === "script") && sameOrigin(request.url(), opts.target)) {
         const body = await response.text().catch(() => "");
         if (body.length < 500_000) this.sources.set(request.url(), body);
+      }
+    });
+
+    // Read the answer the moment it arrives, before any navigation can make it
+    // unreadable.
+    page.on("response", (response) => {
+      const record = this.inflight.get(response.request());
+      if (!record) return;
+      record.status = response.status();
+      if (response.request().resourceType() === "document" && sameOrigin(response.url(), opts.target)) {
+        record.headers = response.headers();
       }
     });
 

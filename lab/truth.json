@@ -217,27 +217,27 @@
       "hint": "create ticket",
       "detectable": "deterministic",
       "severity": "medium",
-      "note": "Pressing Create twice quickly creates two tickets. Owly does not try this yet."
+      "note": "Pressing Create twice quickly creates two tickets. Owly presses the button twice in the same tick and counts the copies."
     },
     {
       "id": "I3",
       "app": "i",
       "kind": "form_server_error",
       "path": "/app/new",
-      "hint": "long title",
+      "hint": "long value in \"title\"",
       "detectable": "deterministic",
       "severity": "high",
-      "note": "A title over 60 characters crashes the server. Owly does not try boundary values yet."
+      "note": "A title over 60 characters crashes the server. Owly pastes an over-long value into one field and reports only the 5xx, never the refusal."
     },
     {
       "id": "I4",
       "app": "i",
       "kind": "signout_ineffective",
-      "path": "/signout",
-      "hint": "sign out",
+      "path": "/app",
+      "hint": "signing out",
       "detectable": "deterministic",
       "severity": "high",
-      "note": "Signing out leaves the session working. Owly does not test sign-out yet."
+      "note": "Signing out leaves the session working. Owly signs out, re-opens a page that a session-less browser was refused, and finds its own account still there."
     }
   ],
   "safety": [
@@ -282,5 +282,21 @@
       "task": "signup",
       "note": "Signing up works here - the bugs are behind it."
     }
-  }
+  },
+  "alsoTrue": [
+    {
+      "kind": "security_headers",
+      "apps": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "h",
+        "i"
+      ],
+      "why": "None of these apps send security headers; only the control app g does."
+    }
+  ]
 }

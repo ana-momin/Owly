@@ -37,6 +37,12 @@ a{color:var(--accent)}
 .pill{font-size:12px;padding:4px 9px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--ink2)}
 
 /* the verdict */
+.read{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px 26px;margin:26px 0}
+.read h2{margin:0 0 8px;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.read .reads{margin:0;font-size:19px;letter-spacing:-.015em;line-height:1.35}
+.read .meta{margin-top:14px}
+.read .why{margin:12px 0 0;font-size:13.5px;color:var(--ink2)}
+.read .why.small{font-size:12.5px;color:var(--dim)}
 .verdict{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
 .verdict .head{display:grid;grid-template-columns:auto 1fr;gap:16px;padding:24px 26px}
 .mark{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none}
@@ -227,6 +233,32 @@ function findingCard(f: Finding, report: RunReport, index: number): string {
 </details>`;
 }
 
+/**
+ * What Owly made of the product, in its own words.
+ *
+ * A tester who has misread what your product is writes a report that sounds
+ * fine and is about the wrong thing. This is the sentence that lets you catch
+ * that in two seconds - and it is labelled as a reading, not a fact.
+ */
+function understandingBlock(report: RunReport): string {
+  const u = report.understanding;
+  if (!u || !u.reads_as) return "";
+  const chips = [
+    ...u.keeps.map((k) => `<span class="pill">${esc(k)}</span>`),
+    ...u.can.map((c) => `<span class="pill">${esc(c)}</span>`),
+  ].join("");
+  const because = u.because.length
+    ? `<p class="why">Because ${u.because.map((b) => esc(b)).join("; ")}.</p>`
+    : "";
+  return `<section class="read">
+    <h2>What Owly took this to be</h2>
+    <p class="reads">${esc(u.reads_as)}.</p>
+    ${chips ? `<div class="meta">${chips}</div>` : ""}
+    ${because}
+    <p class="why small">Read from the words on the page, not from a model. If this is wrong, the findings below are about the wrong product - tell Owly and it will say so plainly.</p>
+  </section>`;
+}
+
 function shell(title: string, body: string, nonce: string, script = ""): string {
   return `<!doctype html>
 <html lang="en"><head>
@@ -302,6 +334,7 @@ ${verdictBlock(report)}
 ${blocking.length ? `<h2>Fix first</h2>${blocking.map((f, i) => findingCard(f, report, i)).join("")}` : ""}
 ${rest.length ? `<h2>Also found</h2>${rest.map((f, i) => findingCard(f, report, blocking.length + i)).join("")}` : ""}
 ${access.length ? `<h2>Accessibility (${access.length})</h2>${access.map((f, i) => findingCard(f, report, blocking.length + rest.length + i)).join("")}` : ""}
+${understandingBlock(report)}
 ${report.findings.length === 0 && !report.failed ? `<div class="empty">No issues reproduced. Every suspected problem was checked again in a fresh browser before it could be listed here.</div>` : ""}
 
 ${report.unverified.length ? `<h2>Seen once, not reproduced</h2><p class="muted">These happened during the test but not again on replay, so they are not counted as issues.</p><ul class="muted">${report.unverified.map((f) => `<li>${esc(f.title)}</li>`).join("")}</ul>` : ""}

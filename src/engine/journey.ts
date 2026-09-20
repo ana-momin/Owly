@@ -18,7 +18,7 @@ import { sameOrigin } from "../policy/urlGuard.js";
 import * as journeyJs from "../browser/journey-inpage.js";
 import * as js from "../browser/inpage.js";
 import type { NetRecord, Session } from "../browser/session.js";
-import { isEmailField, nonce, valueFor, type FieldInfo } from "./synthetic.js";
+import { identityMarker, isEmailField, nonce, valueFor, type FieldInfo } from "./synthetic.js";
 
 export type TaskKind = "signup" | "login" | "checkout" | "contact" | "subscribe" | "book" | "generic";
 
@@ -90,6 +90,13 @@ export interface Journey {
    * broken" on that basis is how a QA tool earns a reputation for noise.
    */
   hardFailure: boolean;
+  /**
+   * The distinctive things Owly typed to become this account - its email, its
+   * name - and never its password. A page that prints one of these back is
+   * showing Owly's own account, which is how the security checks tell a
+   * genuinely private page from an ordinary one.
+   */
+  identity?: string[];
 }
 
 const SUCCESS_WORDS = /\b(welcome|thank you|thanks|success|confirmed|you're in|check your (inbox|email)|verify your email|account created|we'll be in touch|received)\b/i;
@@ -378,6 +385,7 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
   at = Date.now();
   const filled: string[] = [];
   const couldNotFill: string[] = [];
+  const identity: string[] = [];
   const seed = nonce();
   for (const field of fields) {
     const value = valueFor(field, seed);
@@ -387,6 +395,10 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
       if (value.kind === "select") await loc.selectOption(value.value, { timeout: 10_000 });
       else if (value.kind === "check") await loc.check({ timeout: 10_000 });
       else await loc.fill(value.value, { timeout: 10_000 });
+      // Remember who Owly just claimed to be. Later checks use this to tell a
+      // page that belongs to this account from a page that belongs to nobody.
+      const marker = value.kind === "text" ? identityMarker(field, value.value) : null;
+      if (marker && marker.length >= 4 && !identity.includes(marker)) identity.push(marker);
       filled.push(`${field.label || field.name || field.type}: ${field.type === "password" ? "(a password)" : value.value}`);
     } catch (err) {
       couldNotFill.push(`${field.label || field.name || field.type} (${String(err).split("\n")[0]!.slice(0, 80)})`);
@@ -486,6 +498,7 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
       lookedOnly: false,
       stoppedByOwly: false,
       hardFailure,
+      identity,
     };
   }
 }
