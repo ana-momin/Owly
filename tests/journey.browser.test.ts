@@ -86,11 +86,15 @@ describe("when Owly is the one who stops", () => {
     expect(hits.f?.pay_pressed ?? 0).toBe(0);
   }, 120_000);
 
-  it("says a passive scan did not try, rather than that the site failed", async () => {
+  it("says a look-only pass did not try, rather than that the site failed", async () => {
     const j = await journeyFor("a", false);
     expect(j!.lookedOnly).toBe(true);
     expect(j!.hardFailure).toBe(false);
-    expect(j!.reason).toMatch(/passive scan/i);
+    // The words matter as much as the flag: "look-only" told people Owly was
+    // about to do nothing, so the sentence now says it read the pages and
+    // names what it did not do. What is pinned here is that it says BOTH.
+    expect(j!.reason).toMatch(/look-only/i);
+    expect(j!.reason).toMatch(/did not press/i);
 
     // And no finding comes out of it, even though this site IS broken.
     const report = await runTest(appUrl("a"), { allowPrivate: true, mode: "passive" });

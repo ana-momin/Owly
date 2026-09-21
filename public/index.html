@@ -24,62 +24,91 @@
   try {
     var t = localStorage.getItem("owly-theme");
     if (t) document.documentElement.setAttribute("data-theme", t);
+    if (localStorage.getItem("owly-rail") === "closed") document.documentElement.classList.add("rail-closed");
   } catch (e) {}
 </script>
 </head>
 <body>
 
-<header class="top">
-  <a class="mark" href="/"><img src="/icon-64.png" alt="" width="28" height="28" decoding="async"> Owly</a>
-  <nav>
-    <a class="hide-sm" href="/how-it-works">How it works</a>
-    <a class="hide-sm" href="/demo-report">A real report</a>
-    <a class="hide-sm" href="/pricing">Pricing</a>
-    <a href="https://joinpond.ai" rel="noopener">Pond</a>
-    <button class="icon-btn" id="theme" type="button" aria-label="Switch between light and dark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+<div class="shell">
+
+  <aside class="rail" id="rail" aria-label="Your tests">
+    <div class="rail-top">
+      <a class="mark" href="/"><img src="/icon-64.png" alt="" width="26" height="26" decoding="async"> Owly</a>
+      <button class="icon-btn" id="rail-close" type="button" aria-label="Hide the sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+    </div>
+
+    <button class="newchat" id="newchat" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      New test
     </button>
-  </nav>
-</header>
 
-<main>
-  <div class="scroll empty" id="scroll">
-    <div class="col">
+    <nav class="past" id="past" aria-label="Earlier conversations"></nav>
 
-      <div class="hello" id="hello">
-        <img src="/icon-192.png" alt="" width="68" height="68" decoding="async">
-        <h1>What should I test?</h1>
-        <p>Give me a web address. I open it in a real browser and tell you what breaks.</p>
+    <div class="rail-foot">
+      <a href="/how-it-works">How it works</a>
+      <a href="/demo-report">A real report</a>
+      <a href="/pricing">Pricing</a>
+      <a href="https://joinpond.ai" rel="noopener">Pond</a>
+    </div>
+  </aside>
+
+  <div class="rail-veil" id="rail-veil" hidden></div>
+
+  <div class="main-col">
+    <header class="top">
+      <button class="icon-btn" id="rail-open" type="button" aria-label="Show the sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <a class="mark top-mark" href="/"><img src="/icon-64.png" alt="" width="26" height="26" decoding="async"> Owly</a>
+      <div class="spacer"></div>
+      <button class="icon-btn" id="theme" type="button" aria-label="Switch between light and dark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </header>
+
+    <main>
+      <div class="scroll empty" id="scroll">
+        <div class="col">
+
+          <div class="hello" id="hello">
+            <img src="/icon-192.png" alt="" width="62" height="62" decoding="async">
+            <h1>What should I test?</h1>
+            <p>Give me a web address. I open it in a real browser and tell you what breaks.</p>
+          </div>
+
+          <div class="thread" id="thread"></div>
+
+        </div>
       </div>
 
-      <div class="thread" id="thread"></div>
-
-    </div>
-  </div>
-
-  <div class="dock">
-    <div class="col">
-      <form class="box" id="composer" autocomplete="off">
-        <label for="say" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Message Owly</label>
-        <textarea id="say" rows="1" placeholder="Ask anything, or paste a web address"></textarea>
-        <button class="send" id="send" type="submit" aria-label="Send" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-        </button>
-      </form>
-
-      <div class="meta">
-        <span class="chip" id="left" title="Free tests left today">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-          <b>3</b> left today
-        </span>
-        <a class="chip" href="/how-it-works" title="Owly only looks at a site until you verify it is yours">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-          Look only
-        </a>
+      <div class="dock">
+        <div class="col">
+          <form class="box" id="composer" autocomplete="off">
+            <label for="say" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Message Owly</label>
+            <textarea id="say" rows="1" placeholder="Ask about a site, or paste a web address&hellip;"></textarea>
+            <div class="box-foot">
+              <span class="chip" id="left" title="Free tests left today">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <b>3</b>&nbsp;left today
+              </span>
+              <div class="spacer"></div>
+              <button class="ghost-btn" id="explain" type="button" title="What can I ask?" aria-label="What can I ask?">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+              </button>
+              <button class="send" id="send" type="submit" aria-label="Send" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+          </form>
+          <p class="under">Unverified sites are read, never typed into. <a href="/how-it-works">How it works</a></p>
+        </div>
       </div>
-    </div>
+    </main>
   </div>
-</main>
+</div>
 
 <script src="/assets/app.js" defer></script>
 </body>

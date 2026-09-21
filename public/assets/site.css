@@ -210,6 +210,27 @@ section { padding: clamp(64px, 8vw, 104px) 0; position: relative; }
 .plan ul { list-style: none; padding: 0; margin: 22px 0 26px; display: grid; gap: 11px; }
 .plan li { display: flex; gap: 10px; font-size: 16px; }
 .plan li svg { width: 19px; height: 19px; flex: none; margin-top: 4px; }
+.plan .soon { color: var(--muted); }
+.plan.hot .soon { color: #3a2f5c; }
+/* The number people are actually choosing between. */
+.plan .count { font-family: var(--display); font-weight: 600; font-size: 21px; margin: 20px 0 0; }
+.plan .count span { font-size: 15px; color: var(--muted); font-weight: 600; }
+.plan.hot .count span { color: #3a2f5c; }
+
+/*
+ * What every test includes, said ONCE under both cards.
+ *
+ * It used to be a bullet list inside each card, which made the free plan look
+ * better equipped than the paid one - it had six ticks against four, because
+ * the paid card only listed what was different. The features are the same;
+ * the number of tests is the choice. So the features moved out here and the
+ * cards now carry only what actually separates them.
+ */
+.included { margin-top: 34px; background: var(--paper-2); border: var(--line); border-radius: 24px; box-shadow: var(--pop); padding: clamp(24px, 3vw, 34px); }
+.included h3 { font-size: 21px; margin: 0 0 18px; }
+.included ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 13px 26px; }
+.included li { display: flex; gap: 10px; font-size: 15.5px; }
+.included li svg { width: 18px; height: 18px; flex: none; margin-top: 4px; color: var(--tomato-ink); }
 
 /* ---------- faq ---------- */
 .faq { margin-top: 40px; display: grid; gap: 12px; }

@@ -23,11 +23,22 @@ export function esc(value: unknown): string {
 }
 
 const CSS = `
-:root{--paper:#f6f5f1;--card:#fff;--ink:#14161b;--ink2:#474c57;--dim:#5b6270;--line:#e6e4de;
---accent:#3b3bd6;--good:#0f7a43;--good-bg:#e8f6ee;--bad:#b3261e;--bad-bg:#fdecea;--warn:#8a5a00;
---crit:#b3261e;--high:#bf4408;--med:#8a6100;--low:#4b5563;--shadow:0 1px 2px rgba(20,20,30,.05),0 18px 36px -26px rgba(20,20,30,.3)}
+/*
+ * The report is the thing people send to someone else, so it wears the same
+ * clothes as the rest of Owly rather than looking like a tool's output pane.
+ * Same paper, same ink, same purple; and a dark scheme, because a bug report
+ * gets opened at night.
+ */
+:root{--paper:#f7f1e4;--card:#fffaf0;--ink:#21203a;--ink2:#4d4b6b;--dim:#7a7894;--line:rgba(33,32,58,.12);
+--accent:#7b5bc4;--good:#2f8f5b;--good-bg:#e6f4ec;--bad:#c2402c;--bad-bg:#fbeae6;--warn:#8a5a00;
+--crit:#b3261e;--high:#bf4408;--med:#8a6100;--low:#5b5975;--shadow:0 1px 2px rgba(20,20,30,.04),0 18px 36px -28px rgba(20,20,30,.28)}
+@media (prefers-color-scheme:dark){:root{
+--paper:#17162a;--card:#1e1d34;--ink:#f2eee6;--ink2:#b3b0c9;--dim:#8886a3;--line:rgba(242,238,230,.14);
+--accent:#b79ce6;--good:#7fd2a3;--good-bg:#1d3329;--bad:#ef8a76;--bad-bg:#3a241f;
+--crit:#ef8a76;--high:#e8a06a;--med:#d9bd77;--low:#a5a2bd;--shadow:0 1px 2px rgba(0,0,0,.3),0 18px 36px -28px rgba(0,0,0,.6)}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;background:var(--paper);color:var(--ink);font:15.5px/1.6 "Nunito Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3,.brand,.count b,.frame .act{font-family:"Fredoka",ui-rounded,"Segoe UI",sans-serif;font-weight:600;letter-spacing:-.01em}
 .w{max-width:940px;margin:0 auto;padding:32px 20px 80px}
 a{color:var(--accent)}
 .top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px;flex-wrap:wrap}
@@ -49,19 +60,24 @@ a{color:var(--accent)}
 .mark svg{width:24px;height:24px;stroke-width:2.5}
 .ok .mark{background:var(--good-bg);color:var(--good)}
 .no .mark{background:var(--bad-bg);color:var(--bad)}
-.idle .mark{background:#eef0f4;color:var(--dim)}
+.idle .mark{background:var(--paper);color:var(--dim)}
 .verdict h1{font-size:clamp(21px,2.9vw,29px);line-height:1.2;letter-spacing:-.03em;margin:2px 0 6px}
 .verdict .why{color:var(--ink2);margin:0}
 .verdict .why b{color:var(--ink);font-weight:600}
+/* The strip scrolls sideways. A hard clip at the edge read as a broken
+   layout, so the last frame fades instead - which says "there is more". */
+.filmstrip{position:relative}
+.filmstrip::after{content:"";position:absolute;top:0;right:0;bottom:22px;width:56px;pointer-events:none;
+background:linear-gradient(to right,transparent,var(--card))}
 .frames{display:flex;gap:10px;overflow-x:auto;padding:0 26px 22px;scroll-snap-type:x mandatory}
 .frame{flex:none;width:230px;scroll-snap-align:start;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper);text-align:left;padding:0;font:inherit;cursor:zoom-in}
 .frame[disabled]{cursor:default}
-.frame img{display:block;width:100%;height:132px;object-fit:cover;object-position:top;background:#fff;border-bottom:1px solid var(--line)}
+.frame img{display:block;width:100%;height:132px;object-fit:cover;object-position:top;background:var(--card);border-bottom:1px solid var(--line)}
 .frame .cap{display:block;padding:9px 11px;overflow-wrap:anywhere}
 .frame .n{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
 .frame .act{display:block;font-size:13.5px;font-weight:600;letter-spacing:-.01em;margin:1px 0 3px;line-height:1.3}
 .frame .out{display:block;font-size:12.5px;color:var(--ink2);line-height:1.35}
-.frame.bad{border-color:#f3c4bf;background:var(--bad-bg)}
+.frame.bad{border-color:var(--bad);background:var(--bad-bg)}
 .frame.bad .out{color:var(--bad)}
 dialog{border:0;border-radius:14px;padding:0;max-width:min(1100px,94vw);box-shadow:0 30px 60px -20px rgba(0,0,0,.5)}
 dialog::backdrop{background:rgba(16,18,24,.66)}
@@ -80,7 +96,7 @@ h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--di
 .f{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
 .f summary{list-style:none;cursor:pointer;padding:15px 18px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:start}
 .f summary::-webkit-details-marker{display:none}
-.f summary:hover{background:#fbfbf9}
+.f summary:hover{background:var(--paper)}
 .sev{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:3px 7px;border-radius:6px;color:#fff;margin-top:3px}
 .sev.critical{background:var(--crit)}.sev.high{background:var(--high)}.sev.medium{background:var(--med)}.sev.low{background:var(--low)}.sev.info{background:var(--dim)}
 .f .t{font-weight:600;letter-spacing:-.012em}
@@ -90,7 +106,7 @@ h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--di
 @media(max-width:640px){.cols{grid-template-columns:1fr}}
 .box{background:var(--paper);border-radius:10px;padding:11px 13px;font-size:14px}
 .box b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin-bottom:3px}
-.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:650;margin:14px 0 4px}
+.lbl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:650;margin:14px 0 4px}
 ol,ul{margin:5px 0;padding-left:20px}
 li{margin:3px 0}
 .saw li{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;word-break:break-word}
@@ -197,7 +213,7 @@ function verdictBlock(report: RunReport): string {
         ${j.stoppedByOwly || j.lookedOnly ? `<p class="muted" style="margin:8px 0 0">${esc(j.reason ?? "")}</p>` : ""}
       </div>
     </div>
-    ${frames ? `<div class="frames">${frames}</div>` : ""}
+    ${frames ? `<div class="filmstrip"><div class="frames">${frames}</div></div>` : ""}
   </section>`;
 }
 
@@ -266,7 +282,11 @@ function shell(title: string, body: string, nonce: string, script = ""): string 
 <meta name="robots" content="noindex">
 <link rel="icon" href="/icon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="/icon-180.png">
-<meta name="theme-color" content="#2b2b3f">
+<meta name="theme-color" content="#f7f1e4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17162a" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <title>${esc(title)}</title>
 <style>${CSS}</style>
 </head><body><div class="w">

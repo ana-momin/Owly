@@ -14,6 +14,10 @@
  *
  * So when Owly says it found something, that is not a model talking. The
  * model only ever gets to describe a report that already exists.
+ *
+ * A conversation is kept in this browser so a reload does not throw it away.
+ * What is stored is the turns, not the run: the run itself lives on the
+ * server and its report keeps its own address.
  */
 (function () {
   var scroll = document.getElementById("scroll");
@@ -23,25 +27,13 @@
   var input = document.getElementById("say");
   var send = document.getElementById("send");
   var leftChip = document.getElementById("left");
+  var pastList = document.getElementById("past");
   if (!scroll || !thread || !form || !input || !send) return;
 
-  /**
-   * How many free tests are left today. The server is the authority and says
-   * so on every start; this only reflects what it last said, so the number is
-   * never a guess made in the tab.
-   */
-  function setLeft(n) {
-    if (!leftChip) return;
-    var b = leftChip.querySelector("b");
-    if (b) b.textContent = String(Math.max(0, n));
-    leftChip.classList.toggle("none", n <= 0);
-    leftChip.lastChild.textContent = n === 1 ? " left today" : " left today";
-  }
-
   var busy = false;
-  var history = [];
-  var lastReport = null;
   var stopped = false;
+  /** What the model is allowed to describe: the last report, as text. */
+  var lastReport = null;
 
   /* ------------------------------------------------------------- plumbing */
 
@@ -56,41 +48,155 @@
     return n;
   }
 
+  function svg(path, extra) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + "</svg>";
+  }
+
+  var ICON = {
+    copy: svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>'),
+    good: svg('<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3zM7 10l4-7a2 2 0 0 1 3 2l-1 5h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 16.8 21H7"/>'),
+    bad: svg('<path d="M17 14V3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3zM17 14l-4 7a2 2 0 0 1-3-2l1-5H6a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 7.2 3H17"/>'),
+  };
+
+  /* ------------------------------------------------------------- scrolling */
+
   var stick = true;
   scroll.addEventListener("scroll", function () {
-    stick = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 80;
+    stick = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 90;
   });
   function toBottom(force) {
     if (!stick && !force) return;
-    scroll.scrollTop = scroll.scrollHeight;
+    // After the next paint: a block added this tick has no height yet, so
+    // scrolling now would stop just short and look stuck.
+    requestAnimationFrame(function () {
+      scroll.scrollTop = scroll.scrollHeight;
+    });
   }
 
   function began() {
-    if (hello && !hello.hidden) {
-      hello.hidden = true;
-      scroll.classList.remove("empty");
+    if (!scroll.classList.contains("empty")) return;
+    scroll.classList.remove("empty");
+    if (hello) hello.hidden = true;
+  }
+
+  /* --------------------------------------------------------------- storage */
+
+  var KEY = "owly-chats";
+  var chat = null;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      var all = raw ? JSON.parse(raw) : [];
+      return Array.isArray(all) ? all : [];
+    } catch (err) {
+      return [];
+    }
+  }
+  function save(all) {
+    try {
+      // Twenty is plenty and keeps this well inside any storage quota.
+      localStorage.setItem(KEY, JSON.stringify(all.slice(0, 20)));
+    } catch (err) {
+      /* private window, or full: the conversation still works, it just will
+         not survive a reload. Never worth breaking the page over. */
+    }
+  }
+
+  function newChat() {
+    chat = { id: "c" + Date.now().toString(36), title: "New test", at: Date.now(), turns: [] };
+  }
+
+  function remember(turn) {
+    if (!chat) newChat();
+    chat.turns.push(turn);
+    if (chat.title === "New test" && turn.role === "you") chat.title = turn.text.slice(0, 60);
+    chat.at = Date.now();
+    var all = load().filter(function (c) {
+      return c.id !== chat.id;
+    });
+    all.unshift(chat);
+    save(all);
+    drawPast();
+  }
+
+  function drawPast() {
+    if (!pastList) return;
+    var all = load();
+    pastList.innerHTML = "";
+    if (!all.length) {
+      pastList.appendChild(el("p", "none", "Nothing yet. Your tests will be listed here."));
+      return;
+    }
+    pastList.appendChild(el("p", "when", "Earlier"));
+    all.forEach(function (c) {
+      var a = el("a", null, esc(c.title || "Test"));
+      a.href = "#" + c.id;
+      if (chat && c.id === chat.id) a.setAttribute("aria-current", "true");
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        open(c.id);
+      });
+      pastList.appendChild(a);
+    });
+  }
+
+  function open(id) {
+    var found = load().filter(function (c) {
+      return c.id === id;
+    })[0];
+    if (!found) return;
+    chat = found;
+    thread.innerHTML = "";
+    lastReport = null;
+    found.turns.forEach(replay);
+    if (found.turns.length) began();
+    drawPast();
+    toBottom(true);
+    closeRailOnPhone();
+  }
+
+  /** Put a stored turn back on screen. */
+  function replay(t) {
+    if (t.role === "you") return youSaid(t.text, true);
+    if (t.role === "owly") return say(t.text, true);
+    if (t.role === "report") {
+      var box = owlySays();
+      if (t.notes && t.notes.length) {
+        var work = el("div", "work", "<ul></ul>");
+        var ul = work.querySelector("ul");
+        t.notes.forEach(function (n) {
+          var li = el("li", n.kind || "");
+          li.appendChild(el("span", "tag", n.tag));
+          li.appendChild(el("span", "", esc(n.text)));
+          ul.appendChild(li);
+        });
+        box.appendChild(work);
+      }
+      box.appendChild(card(t.summary, t.url));
+      lastReport = t.context || null;
     }
   }
 
   /* ------------------------------------------------------------- messages */
 
-  function youSaid(text) {
+  function youSaid(text, quiet) {
     began();
     var turn = el("div", "turn you");
     turn.appendChild(el("div", "bubble", esc(text)));
     thread.appendChild(turn);
+    if (!quiet) remember({ role: "you", text: text });
     toBottom(true);
   }
 
-  /** An Owly turn. Returns the element its content goes in. */
   function owlySays() {
     began();
     var turn = el("div", "turn owly");
     var face = el("img", "face");
     face.src = "/icon-64.png";
     face.alt = "";
-    face.width = 27;
-    face.height = 27;
+    face.width = 26;
+    face.height = 26;
     turn.appendChild(face);
     var say = el("div", "say");
     turn.appendChild(say);
@@ -99,31 +205,79 @@
     return say;
   }
 
-  /**
-   * The little formatting a reply is allowed: paragraphs, **bold**, `code`.
-   * Everything is escaped first, so this can never inject markup even if a
-   * model is talked into trying.
-   */
+  /** Paragraphs, **bold** and `code`. Escaped first, so markup can never get in. */
   function rich(text) {
     return esc(text)
       .split(/\n{2,}/)
       .map(function (para) {
-        return (
-          "<p>" +
-          para
-            .replace(/\n/g, "<br>")
-            .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-            .replace(/`([^`]+)`/g, "<code>$1</code>") +
-          "</p>"
-        );
+        return "<p>" + para.replace(/\n/g, "<br>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>") + "</p>";
       })
       .join("");
   }
 
-  function say(text) {
+  /**
+   * Copy, and a thumb either way.
+   *
+   * The thumbs are honest about what they are: nothing is sent anywhere, so
+   * the button says "noted" rather than pretending a rating went somewhere.
+   */
+  function actions(box, text) {
+    var row = el("div", "acts");
+
+    var copy = el("button", null, ICON.copy);
+    copy.type = "button";
+    copy.title = "Copy";
+    copy.setAttribute("aria-label", "Copy this answer");
+    var said = el("span", "said");
+    copy.addEventListener("click", function () {
+      var done = function () {
+        said.textContent = "Copied";
+        row.classList.add("stuck");
+        setTimeout(function () {
+          said.textContent = "";
+          row.classList.remove("stuck");
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {
+          said.textContent = "Could not copy";
+        });
+      } else {
+        said.textContent = "Could not copy";
+      }
+    });
+    row.appendChild(copy);
+
+    ["good", "bad"].forEach(function (kind) {
+      var b = el("button", null, ICON[kind]);
+      b.type = "button";
+      b.title = kind === "good" ? "This was useful" : "This was not useful";
+      b.setAttribute("aria-label", b.title);
+      b.addEventListener("click", function () {
+        var already = b.classList.contains("on");
+        row.querySelectorAll("button.on").forEach(function (x) {
+          x.classList.remove("on");
+        });
+        if (!already) b.classList.add("on");
+        said.textContent = already ? "" : "Noted";
+        row.classList.add("stuck");
+        setTimeout(function () {
+          said.textContent = "";
+          row.classList.remove("stuck");
+        }, 1600);
+      });
+      row.appendChild(b);
+    });
+
+    row.appendChild(said);
+    box.appendChild(row);
+  }
+
+  function say(text, quiet) {
     var box = owlySays();
     box.innerHTML = rich(text);
-    history.push({ role: "assistant", content: text });
+    actions(box, text);
+    if (!quiet) remember({ role: "owly", text: text });
     toBottom();
     return box;
   }
@@ -138,7 +292,7 @@
 
   function grow() {
     input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, window.innerHeight * 0.42) + "px";
+    input.style.height = Math.min(input.scrollHeight, window.innerHeight * 0.38) + "px";
   }
   input.addEventListener("input", function () {
     grow();
@@ -153,13 +307,12 @@
 
   function lock(on) {
     busy = on;
-    input.disabled = false;
     send.disabled = on ? false : !input.value.trim();
     send.classList.toggle("stop", on);
     send.setAttribute("aria-label", on ? "Stop" : "Send");
     send.innerHTML = on
       ? '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2.5"/></svg>'
-      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7"/></svg>';
   }
 
   form.addEventListener("submit", function (e) {
@@ -175,38 +328,50 @@
     turn(text);
   });
 
+  function historyForModel() {
+    return (chat ? chat.turns : [])
+      .filter(function (t) {
+        return t.role === "you" || t.role === "owly";
+      })
+      .slice(-12)
+      .map(function (t) {
+        return { role: t.role === "you" ? "user" : "assistant", content: t.text };
+      });
+  }
 
-  /* ---------------------------------------------------------------- a turn */
+  /* --------------------------------------------------------------- a turn */
 
   async function turn(text) {
     youSaid(text);
-    history.push({ role: "user", content: text });
     lock(true);
     stopped = false;
 
-    var thinking = owlySays();
-    thinking.innerHTML = '<div class="work"><div class="now"><span class="dot"></span><span class="text">Thinking</span></div></div>';
+    var waiting = owlySays();
+    var w = el("div", "work", '<div class="now"><span class="beat"><i></i><i></i><i></i></span><span class="text">Thinking</span></div>');
+    waiting.appendChild(w);
+    toBottom();
 
     var data;
     try {
       var res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history.slice(-12), report: lastReport }),
+        body: JSON.stringify({ messages: historyForModel(), report: lastReport }),
       });
       data = await res.json();
     } catch (err) {
-      thinking.parentNode.remove();
+      waiting.parentNode.remove();
       oops("I could not reach the server. Try again in a moment.");
       lock(false);
       return;
     }
 
-    thinking.parentNode.remove();
+    waiting.parentNode.remove();
 
     if (data && data.test) {
       await runTest(data.test);
       lock(false);
+      input.focus();
       return;
     }
     say((data && data.reply) || "I test websites. Paste an address and I will take a look.");
@@ -214,80 +379,70 @@
     input.focus();
   }
 
-  /* ------------------------------------------------------------ the test */
-
-  function liveBox() {
-    var say = owlySays();
-    var work = el("div", "work", '<div class="now"><span class="dot"></span><span class="text">Checking that address</span><span class="clock"></span></div><ul></ul>');
-    say.appendChild(work);
-    toBottom();
-    return {
-      box: say,
-      text: work.querySelector(".text"),
-      clock: work.querySelector(".clock"),
-      list: work.querySelector("ul"),
-      head: work.querySelector(".now"),
-    };
-  }
+  /* -------------------------------------------------------------- the test */
 
   async function runTest(site) {
-    var live = liveBox();
-    var began = Date.now();
+    var box = owlySays();
+    var work = el("div", "work", '<div class="now"><span class="beat"><i></i><i></i><i></i></span><span class="text">Checking that address</span><span class="clock"></span></div><ul></ul>');
+    box.appendChild(work);
+    var head = work.querySelector(".now");
+    var textEl = work.querySelector(".text");
+    var clock = work.querySelector(".clock");
+    var list = work.querySelector("ul");
+    toBottom();
+
+    var startedAt = Date.now();
     var tick = setInterval(function () {
-      var s = Math.round((Date.now() - began) / 1000);
-      live.clock.textContent = s >= 3 ? s + "s" : "";
+      var s = Math.round((Date.now() - startedAt) / 1000);
+      clock.textContent = s >= 3 ? s + "s" : "";
     }, 1000);
 
+    var notes = [];
     function now(text) {
-      live.text.textContent = text;
+      textEl.textContent = text;
       toBottom();
     }
-    function note(text, kind) {
+    function note(text, kind, tag) {
       var li = el("li", kind || "");
-      li.appendChild(el("span", "tag", kind === "found" ? "found" : kind === "clear" ? "clear" : "note"));
+      li.appendChild(el("span", "tag", tag || "note"));
       li.appendChild(el("span", "", esc(text)));
-      live.list.appendChild(li);
-      toBottom();
-    }
-    /** How the run was scoped. Not a finding either way, so not coloured. */
-    function scope(text) {
-      note(text, "");
-    }
-
-    /*
-     * A suspicion and its confirmation are the same sentence twice - "Possible
-     * issue: X" then "Confirmed: X" - and printing both reads like a stutter.
-     * The second one rewrites the first instead, so the line you end up with
-     * says what was decided, and the verifying is visible as it happens rather
-     * than as a duplicate afterwards.
-     */
-    var claims = {};
-    function claim(text, level) {
-      // Every prefix the engine puts in front of the same sentence. Missing
-      // one shows up as the line appearing twice, which is exactly the
-      // stutter this is here to prevent.
-      var body = text
-        .replace(/^(possible issue|confirmed|likely|dropped|dismissed|could not reproduce, so not reported)\s*:\s*/i, "")
-        .trim();
-      var known = claims[body];
-      var kind = level === "confirmed" ? "found" : level === "suspect" ? "checking" : "";
-      if (known) {
-        known.className = kind;
-        known.firstChild.textContent = level === "confirmed" ? "found" : level === "suspect" ? "checking" : "dropped";
-        known.lastChild.textContent = body;
-        toBottom();
-        return;
-      }
-      var li = el("li", kind);
-      li.appendChild(el("span", "tag", level === "confirmed" ? "found" : level === "suspect" ? "checking" : "dropped"));
-      li.appendChild(el("span", "", body));
-      live.list.appendChild(li);
-      claims[body] = li;
+      list.appendChild(li);
+      notes.push({ text: text, kind: kind || "", tag: tag || "note" });
       toBottom();
     }
     function done() {
       clearInterval(tick);
-      live.head.remove();
+      head.remove();
+      if (!list.children.length) list.remove();
+    }
+
+    /*
+     * A suspicion and its confirmation are the same sentence twice. The
+     * second rewrites the first, so the line you end up with says what was
+     * decided, and the checking is visible as it happens.
+     */
+    var claims = {};
+    function claim(text, level) {
+      var body = text.replace(/^(possible issue|confirmed|likely|dropped|dismissed|could not reproduce, so not reported)\s*:\s*/i, "").trim();
+      var tag = level === "confirmed" ? "found" : level === "suspect" ? "checking" : "dropped";
+      var kind = level === "confirmed" ? "found" : level === "suspect" ? "checking" : "";
+      var known = claims[body];
+      if (known) {
+        known.li.className = kind;
+        known.li.firstChild.textContent = tag;
+        known.note.kind = kind;
+        known.note.tag = tag;
+        toBottom();
+        return;
+      }
+      var li = el("li", kind);
+      li.appendChild(el("span", "tag", tag));
+      li.appendChild(el("span", "", body));
+      list.appendChild(li);
+      var rec = { text: body, kind: kind, tag: tag };
+      notes.push(rec);
+      claims[body] = { li: li, note: rec };
+      toBottom();
     }
 
     var res, body;
@@ -300,48 +455,19 @@
       body = await res.json();
     } catch (err) {
       done();
-      live.box.innerHTML = '<p class="oops">I could not reach the server. Try again in a moment.</p>';
+      box.innerHTML = '<p class="oops">I could not reach the server. Try again in a moment.</p>';
       return;
     }
 
     if (!res.ok || !body.id) {
       done();
-      var why = (body && body.error && body.error.message) || "I could not start that test.";
+      box.innerHTML = "";
       if (body && body.error && body.error.code === "rate_limited") {
-        // Running out is not an error the way a broken address is: the answer
-        // is a door, not a red line. So it gets the same card a finished run
-        // gets, with somewhere to go.
         setLeft(0);
-        live.box.innerHTML = "";
-        var out = el("div", "result");
-        out.appendChild(
-          el(
-            "div",
-            "head",
-            "<h2>That is today's free tests used up</h2>" +
-              '<div class="sub">The site gives 3 a day so one visitor cannot spend the whole budget. It resets at midnight UTC.</div>',
-          ),
-        );
-        out.appendChild(
-          el(
-            "div",
-            "body",
-            "<p>Owly is also on Pond, where it has its own free tier and no daily cap &mdash; that is the same agent, with the full test rather than a look.</p>",
-          ),
-        );
-        var foot = el("div", "foot");
-        var pond = el("a", "linkish primary", "Use Owly on Pond");
-        pond.href = "https://joinpond.ai";
-        pond.rel = "noopener";
-        foot.appendChild(pond);
-        var plans = el("a", "linkish", "See the plans");
-        plans.href = "/pricing";
-        foot.appendChild(plans);
-        out.appendChild(foot);
-        live.box.appendChild(out);
-        return;
+        box.appendChild(spent());
+      } else {
+        box.innerHTML = '<p class="oops">' + esc((body && body.error && body.error.message) || "I could not start that test.") + "</p>";
       }
-      live.box.innerHTML = '<p class="oops">' + esc(why) + "</p>";
       return;
     }
     if (typeof body.left === "number") setLeft(body.left);
@@ -351,10 +477,21 @@
       host = new URL(body.target).host;
     } catch (err) {}
 
-    scope(
+    // Said as what WILL happen, not only what will not.
+    //
+    // "I will look but not touch" read as "I am about to do nothing" - and
+    // then Owly worked for the better part of a minute and produced a report,
+    // which looked like it had ignored its own promise. It had not: a
+    // look-only pass still opens every page and checks layout, links,
+    // accessibility and headers. It just never types or clicks.
+    note(
       body.mode === "full"
-        ? host + " is verified as yours, so this is a full test: forms filled in, buttons pressed."
-        : host + " is not verified as yours, so I will look but not touch - no typing, no pressing.",
+        ? host + " is verified as yours, so this is the full test: I will fill in forms and press buttons as well as read the pages."
+        : host +
+            " is not verified as yours, so this is a look-only pass. I will still open its pages and check layout, links, accessibility" +
+            " and security headers, which takes a minute or two - but I will not type into any form or press any button.",
+      "",
+      body.mode === "full" ? "full" : "reading",
     );
     now("Opening " + host);
 
@@ -363,8 +500,8 @@
     while (guard++ < 60) {
       if (stopped) {
         done();
-        note("Stopped. The run carries on on the server.", "");
-        live.box.appendChild(reportLinks(body.report_url));
+        note("Stopped. The run carries on on the server.", "", "note");
+        box.appendChild(links(body.report_url, body.mode !== "full"));
         return;
       }
       var step, data;
@@ -373,8 +510,8 @@
         data = await step.json();
       } catch (err) {
         done();
-        note("I lost the connection, but the run is still going on the server.", "");
-        live.box.appendChild(reportLinks(body.report_url));
+        note("I lost the connection, but the run is still going on the server.", "", "note");
+        box.appendChild(links(body.report_url, body.mode !== "full"));
         return;
       }
 
@@ -382,88 +519,91 @@
       for (var i = seen; i < events.length; i++) {
         var e = events[i];
         if (e.level === "suspect" || e.level === "confirmed" || e.level === "dismissed") claim(e.text, e.level);
-        else if (e.level === "warn") note(e.text, "");
+        else if (e.level === "warn") note(e.text, "", "note");
         else now(e.text);
       }
       seen = events.length;
 
       if (data.status === "completed") {
         done();
-        return finish(live, data.summary, body.report_url);
+        return finish(box, data.summary, body.report_url, notes);
       }
       if (data.status === "failed") {
         done();
-        note(data.error || "The test did not finish.", "found");
+        note(data.error || "The test did not finish.", "found", "failed");
         return;
       }
     }
     done();
-    note("Still running, longer than I can narrate here.", "");
-    live.box.appendChild(reportLinks(body.report_url));
+    note("Still running, longer than I can narrate here.", "", "note");
+    box.appendChild(links(body.report_url, body.mode !== "full"));
   }
 
-  function reportLinks(url) {
+  /* -------------------------------------------------------------- the card */
+
+  function links(url, passive) {
     var foot = el("div", "foot");
     var a = el("a", "linkish primary", "Open the full report");
     a.href = url;
     foot.appendChild(a);
-    var again = el("button", "linkish", "Test another site");
-    again.type = "button";
-    again.addEventListener("click", function () {
-      input.focus();
-    });
-    foot.appendChild(again);
+    if (passive) {
+      // What someone actually wants after a look-only pass is the rest of the
+      // test, which means verifying the site. "Test another site" was a
+      // button whose whole function was to focus the box below it.
+      var verify = el("a", "linkish", "Get the full test");
+      verify.href = "/how-it-works";
+      foot.appendChild(verify);
+    }
     return foot;
   }
 
-  /**
-   * The run is over. The card goes UNDER what was narrated rather than over
-   * it: how the run was scoped - looked at but not touched, say - is the
-   * thing people most need to still be able to see afterwards, and replacing
-   * the trace with a tidy summary quietly threw it away.
-   */
-  function finish(live, summary, reportUrl) {
-    if (!live.list.children.length) live.list.remove();
-    if (!summary) {
-      live.box.appendChild(rowsOnly("Done.", reportUrl));
-      return;
-    }
-
-    var card = el("div", "result");
+  function card(summary, reportUrl) {
+    var wrap = el("div", "result");
     var head = el("div", "head");
     head.appendChild(el("h2", "", esc(summary.headline)));
-    var facts =
-      (summary.mode === "full" ? "full test" : "passive scan") +
-      " · " +
-      summary.pages +
-      (summary.pages === 1 ? " page" : " pages") +
-      " · " +
-      summary.counts +
-      " · " +
-      summary.seconds +
-      "s";
-    head.appendChild(el("div", "sub", esc(facts)));
-    card.appendChild(head);
+    head.appendChild(el("div", "sub", esc(facts(summary))));
+    wrap.appendChild(head);
 
     if (summary.detail || (summary.findings && summary.findings.length)) {
-      var bodyEl = el("div", "body");
-      if (summary.detail) bodyEl.appendChild(el("p", "", esc(summary.detail)));
+      var body = el("div", "body");
+      if (summary.detail) body.appendChild(el("p", "", esc(summary.detail)));
       (summary.findings || []).forEach(function (f) {
         var row = el("div", "item");
         row.appendChild(el("span", "sev " + esc(f.severity), esc(f.severity)));
         row.appendChild(el("span", "what", esc(f.title)));
-        bodyEl.appendChild(row);
+        body.appendChild(row);
       });
-      card.appendChild(bodyEl);
+      wrap.appendChild(body);
     }
-    card.appendChild(reportLinks(reportUrl));
-    live.box.appendChild(card);
+    wrap.appendChild(links(reportUrl, summary.mode !== "full"));
+    return wrap;
+  }
 
-    // What the model is allowed to talk about from here on.
-    lastReport = [
+  function facts(s) {
+    return (
+      (s.mode === "full" ? "full test" : "look-only pass") +
+      " · " +
+      s.pages +
+      (s.pages === 1 ? " page" : " pages") +
+      " · " +
+      s.counts +
+      " · " +
+      s.seconds +
+      "s"
+    );
+  }
+
+  function finish(box, summary, reportUrl, notes) {
+    if (!summary) {
+      box.appendChild(links(reportUrl, false));
+      return;
+    }
+    box.appendChild(card(summary, reportUrl));
+
+    var context = [
       summary.headline,
       summary.detail || "",
-      facts,
+      facts(summary),
       (summary.findings || [])
         .map(function (f) {
           return "- " + f.severity + ": " + f.title;
@@ -473,37 +613,106 @@
     ]
       .filter(Boolean)
       .join("\n");
-    history.push({ role: "assistant", content: lastReport });
+    lastReport = context;
+    remember({ role: "report", summary: summary, url: reportUrl, notes: notes, context: context });
     toBottom();
   }
 
-  function rowsOnly(text, url) {
-    var wrap = el("div", "result");
-    wrap.appendChild(el("div", "head", "<h2>" + esc(text) + "</h2>"));
-    wrap.appendChild(reportLinks(url));
-    return wrap;
+  /** The card shown when the day's free tests are gone. */
+  function spent() {
+    var out = el("div", "result");
+    out.appendChild(
+      el(
+        "div",
+        "head",
+        "<h2>That is today's free tests used up</h2>" +
+          '<div class="sub">The site gives 3 a day so one visitor cannot spend the whole budget. It resets at midnight UTC.</div>',
+      ),
+    );
+    out.appendChild(el("div", "body", "<p>Owly is also on Pond, where it has its own free tier and no daily cap &mdash; the same agent, with the full test rather than a look.</p>"));
+    var foot = el("div", "foot");
+    var pond = el("a", "linkish primary", "Use Owly on Pond");
+    pond.href = "https://joinpond.ai";
+    pond.rel = "noopener";
+    foot.appendChild(pond);
+    var plans = el("a", "linkish", "See the plans");
+    plans.href = "/pricing";
+    foot.appendChild(plans);
+    out.appendChild(foot);
+    return out;
   }
 
-  /* ---------------------------------------------------------------- theme */
+  /* ------------------------------------------------------------ the chrome */
+
+  function setLeft(n) {
+    if (!leftChip) return;
+    var b = leftChip.querySelector("b");
+    if (b) b.textContent = String(Math.max(0, n));
+    leftChip.classList.toggle("none", n <= 0);
+  }
+
+  var root = document.documentElement;
+  function closeRailOnPhone() {
+    if (matchMedia("(max-width: 860px)").matches) root.classList.remove("rail-open");
+  }
+  function railToggle(open) {
+    if (matchMedia("(max-width: 860px)").matches) {
+      root.classList.toggle("rail-open", open);
+      var veil = document.getElementById("rail-veil");
+      if (veil) veil.hidden = !open;
+      return;
+    }
+    root.classList.toggle("rail-closed", !open);
+    try {
+      localStorage.setItem("owly-rail", open ? "open" : "closed");
+    } catch (err) {}
+  }
+  var openBtn = document.getElementById("rail-open");
+  var closeBtn = document.getElementById("rail-close");
+  var veil = document.getElementById("rail-veil");
+  if (openBtn) openBtn.addEventListener("click", function () { railToggle(true); });
+  if (closeBtn) closeBtn.addEventListener("click", function () { railToggle(false); });
+  if (veil) veil.addEventListener("click", function () { railToggle(false); });
+
+  var fresh = document.getElementById("newchat");
+  if (fresh)
+    fresh.addEventListener("click", function () {
+      newChat();
+      thread.innerHTML = "";
+      lastReport = null;
+      scroll.classList.add("empty");
+      if (hello) hello.hidden = false;
+      drawPast();
+      closeRailOnPhone();
+      input.focus();
+    });
+
+  var explain = document.getElementById("explain");
+  if (explain)
+    explain.addEventListener("click", function () {
+      if (busy) return;
+      turn("What can I ask you, and what do you check?");
+    });
 
   var toggle = document.getElementById("theme");
-  if (toggle) {
-    var saved = null;
-    try {
-      saved = localStorage.getItem("owly-theme");
-    } catch (err) {}
-    if (saved) document.documentElement.setAttribute("data-theme", saved);
+  if (toggle)
     toggle.addEventListener("click", function () {
-      var dark = document.documentElement.getAttribute("data-theme") === "dark" ||
-        (!document.documentElement.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+      var dark = root.getAttribute("data-theme") === "dark" || (!root.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
       var next = dark ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", next);
+      root.setAttribute("data-theme", next);
       try {
         localStorage.setItem("owly-theme", next);
       } catch (err) {}
     });
-  }
 
+  /* ----------------------------------------------------------------- start */
+
+  var all = load();
+  if (all.length) open(all[0].id);
+  else {
+    newChat();
+    drawPast();
+  }
   lock(false);
   grow();
   if (!matchMedia("(pointer: coarse)").matches) input.focus();

@@ -226,7 +226,7 @@ export async function runJourney(s: Session, startUrl: string, interactive: bool
       steps,
       completed: false,
       reason: !interactive
-        ? `This was a passive scan, so Owly did not press "${entry.name}". Verify the site to have the whole journey attempted.`
+        ? `This was a look-only pass, so Owly read the pages but did not press "${entry.name}". Verify the site to have the whole journey attempted.`
         : `Owly does not press "${entry.name}" automatically: ${guard.reason}.`,
       observed,
       durationMs: Date.now() - started,
