@@ -3,23 +3,24 @@
  *
  * Owly's findings never come from a language model and never will: they come
  * from a browser that did the thing and recorded what happened. What a model
- * is good at is the part around that - understanding "can you check if signup
- * is broken on acme.dev", explaining a finding in plainer words, answering
- * "what does lost write mean". So that is all it does here.
+ * is good at is everything around that - understanding "is signup broken on
+ * acme.dev", noticing this is the third run of the same site this week,
+ * deciding that testing facebook.com would waste the one thing the person
+ * has a limited number of.
  *
- * Two hard rules, enforced in the prompt and by what this file passes in:
+ * So the model is given judgement and the means to act on it: memory of what
+ * has been tested before, and tools it can call. What it is never given is
+ * the ability to invent a result, or to start a run on its own authority -
+ * it proposes, and this file's caller applies the same rate limits,
+ * ownership checks and URL guards it would to a button press.
  *
- *   1. The model is never given the power to invent a finding. It only ever
- *      sees the report Owly already produced, and is told to refuse to go
- *      beyond it. If no run has happened, it has nothing to describe.
- *   2. The model cannot start a test on its own authority. It emits an
- *      intent; the server applies the same rate limits, ownership checks and
- *      URL guards to it as it would to a button press.
- *
- * With no API key configured the whole thing degrades to a plain URL
- * detector, which is exactly what the page did before. The product works
- * without a model; the model only makes it nicer to talk to.
+ * With no API key configured the whole thing falls back to spotting an
+ * address in the text, which is what the page did before any of this. The
+ * product works without a model; the model makes it better at knowing what
+ * is worth doing.
  */
+
+import { brief, clean, hostOf, type Memory } from "./memory.js";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -29,14 +30,25 @@ export interface ChatMessage {
 export interface ChatDecision {
   /** What to say back. Empty when the reply is only an action. */
   reply: string;
-  /** A site the visitor asked Owly to test, if the turn asked for one. */
+  /** A site Owly decided to test this turn. */
   test: string | null;
+  /** Facts the model asked to keep, for the browser to store. */
+  remember: string[];
+  /** A site the model was told is the person's own. */
+  mine: string | null;
   /** True when a model wrote the reply, so the page can say so. */
   byModel: boolean;
 }
 
+export interface Context {
+  report: string | null;
+  memory: Memory;
+  /** Free tests left today, as the server counted them. */
+  left: number;
+}
+
 /**
- * Providers, in the order they are tried. Both speak the OpenAI chat shape,
+ * Providers, in the order they are tried. All speak the OpenAI chat shape,
  * so one client covers them. Groq and Gemini both have a free tier that does
  * not need a card, which is the whole reason they are the defaults.
  */
@@ -97,121 +109,14 @@ export function findSite(text: string): string | null {
   return host + (m[2] ?? "");
 }
 
-const SYSTEM = `You are Owly, an autonomous QA agent. You test websites by opening them in a real browser as a new user would.
-
-How you work, so you can explain it accurately:
-- You attempt the site's main task (usually signing up), then check pages for broken links, layout problems on a phone, accessibility failures, keyboard traps, failing requests and security problems.
-- If the owner has verified the site, you also type into forms and press buttons. If not, you only look - no typing, no pressing. You always say which it was.
-- You never report anything you could not reproduce. Every finding was checked again in a fresh browser first.
-- You test what is behind a login by signing up as your own synthetic user.
-
-Absolute rules you never break:
-- NEVER invent, guess at, or embellish a finding. You may only describe results you were given in this conversation. If you were not given results, say the test has not run yet.
-- NEVER claim a site is fine if no test ran. "Nothing was tested" is not "nothing is wrong", and you say so plainly.
-- You cannot start a test yourself. If the person wants one, ask them to confirm the address and it will be started for you.
-- You are not a general assistant. If asked something unrelated to testing their site, say briefly that this is all you do.
-
-How you talk: plain words, short. No emoji. No exclamation marks. Do not use headings or bullet lists unless you are listing findings. Never pad with "Great question" or "I'd be happy to". You are a competent colleague, not a chatbot.`;
-
-async function ask(provider: Provider, messages: Array<{ role: string; content: string }>, signal?: AbortSignal): Promise<string | null> {
-  const key = process.env[provider.env];
-  if (!key) return null;
-
-  for (const model of provider.models) {
-    const res = await fetch(provider.url, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: 700 }),
-      ...(signal ? { signal } : {}),
-    });
-    if (!res.ok) {
-      console.log(`chat: ${provider.name}/${model} answered ${res.status}`);
-      // A missing model is worth trying the next name for. A bad key or a
-      // spent quota is not, and hammering the list would only make it worse.
-      if (res.status === 404 || res.status === 400) continue;
-      return null;
-    }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const text = data.choices?.[0]?.message?.content;
-    if (typeof text === "string" && text.trim()) return text.trim();
-    return null;
-  }
-  return null;
-}
-
 /**
- * Work out what this turn means.
+ * Sites almost nobody asking Owly a question owns.
  *
- * `report` is the text of the run that has already happened, when there is
- * one. It is the ONLY source the model is allowed to describe.
+ * This is a hint to the model, not a wall: with memory, "you told me it is
+ * mine" beats the list. It stays a hard gate only on the no-model path,
+ * where nothing else is capable of the judgement.
  */
-export async function decide(history: ChatMessage[], report: string | null): Promise<ChatDecision> {
-  const last = history.filter((m) => m.role === "user").at(-1)?.content ?? "";
-  const site = findSite(last);
-  const provider = activeProvider();
-
-  // Asking for a site to be tested is unambiguous enough to act on without a
-  // model, and doing so keeps the common path fast and free.
-  if (site) {
-    const refusal = notYours(site);
-    if (refusal) return { reply: refusal, test: null, byModel: false };
-  }
-
-  // "It is mine" after Owly declined a well-known site. The refusal is a
-  // guess about ownership, and a guess has to be correctable by the person
-  // who actually knows - otherwise it is just a wall.
-  if (!site && MINE.test(last)) {
-    const declined = lastDeclined(history);
-    if (declined) return { reply: "", test: declined, byModel: false };
-  }
-
-  if (site && !report) {
-    return { reply: "", test: site, byModel: false };
-  }
-
-  if (!provider) {
-    return { reply: fallback(last, report), test: null, byModel: false };
-  }
-
-  const messages: Array<{ role: string; content: string }> = [{ role: "system", content: SYSTEM }];
-  if (report) {
-    messages.push({
-      role: "system",
-      content: `This is the result of the test you just ran. It is the only thing you may describe. Do not add to it.\n\n---\n${report.slice(0, 12_000)}\n---`,
-    });
-  } else {
-    messages.push({ role: "system", content: "No test has run in this conversation yet. You have no results to describe." });
-  }
-  for (const m of history.slice(-10)) messages.push({ role: m.role, content: m.content.slice(0, 4000) });
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
-  try {
-    const text = await ask(provider, messages, controller.signal);
-    if (text) return { reply: text, test: null, byModel: true };
-  } catch (err) {
-    console.log(`chat: ${provider.name} failed: ${String(err).slice(0, 120)}`);
-  } finally {
-    clearTimeout(timer);
-  }
-  return { reply: fallback(last, report), test: null, byModel: false };
-}
-
-/**
- * Sites nobody asking Owly a question owns.
- *
- * Someone typed facebook.com and Owly spent a minute reading it and handed
- * back a report - and the report was useless, because you cannot fix
- * Facebook's keyboard focus. Worse, it cost one of that visitor's three free
- * tests to learn nothing. An agent worth the name knows the difference
- * between a site you are asking about and a site you can act on.
- *
- * Deliberately a short list of the obvious ones rather than a clever guess.
- * A wrong refusal is much more annoying than a wrong run: someone whose own
- * product happens to be small and unknown must never be told it is not
- * theirs. So this only ever names companies where the answer is not in doubt.
- */
-const NOT_YOURS = [
+const WELL_KNOWN = [
   "google", "youtube", "facebook", "instagram", "whatsapp", "x", "twitter", "tiktok", "linkedin",
   "reddit", "wikipedia", "amazon", "apple", "microsoft", "netflix", "openai", "anthropic", "claude",
   "github", "gitlab", "stackoverflow", "yahoo", "bing", "baidu", "spotify", "twitch", "discord",
@@ -219,18 +124,20 @@ const NOT_YOURS = [
   "notion", "figma", "canva", "dropbox", "vercel", "cloudflare", "meta", "xai", "deepseek",
 ];
 
-/** The registrable-ish name: "www.facebook.com/x" -> "facebook". */
 function brandOf(site: string): string {
-  const host = site.replace(/^https?:\/\//i, "").split("/")[0]!.split(":")[0]!.toLowerCase();
-  const parts = host.replace(/^www\./, "").split(".");
-  // For "x.ai" that is "x"; for "google.co.uk" it is still "google".
+  const host = hostOf(site);
+  const parts = host.split(".");
   return parts.length > 2 && parts[parts.length - 2] === "co" ? parts[parts.length - 3]! : parts[0]!;
 }
 
+export function wellKnown(site: string): boolean {
+  return WELL_KNOWN.includes(brandOf(site));
+}
+
+/** The refusal, for the path where there is no model to write one. */
 export function notYours(site: string): string | null {
-  const brand = brandOf(site);
-  if (!NOT_YOURS.includes(brand)) return null;
-  const host = site.replace(/^https?:\/\//i, "").split("/")[0]!;
+  if (!wellKnown(site)) return null;
+  const host = hostOf(site);
   return (
     `That is ${host}, which I am guessing is not yours to change.\n\n` +
     `I could read its pages, but I would only be able to tell you about problems you cannot fix - and it would use one of your free tests to do it. ` +
@@ -242,6 +149,18 @@ export function notYours(site: string): string | null {
 /** Someone telling Owly the site it declined really is theirs. */
 const MINE = /\b(it('?s| is)? ?mine|is mine|i own (it|that)|my (site|domain)|yes,? ?(it('?s| is)? ?mine)?|run it|do it anyway|go ahead)\b/i;
 
+/**
+ * "acme.dev is my site" - a claim of ownership naming the site in the same
+ * breath. Worth catching without a model, because forgetting it is the
+ * difference between Owly knowing someone next visit and not.
+ */
+export function ownershipClaim(text: string): string | null {
+  const site = findSite(text);
+  if (!site) return null;
+  const owns = /\b(is|are)\s+(my|our|mine)\b|\bmy\s+(site|website|app|domain|product|project)\b|\bi\s+(own|run|built|made)\b|\bwe\s+(own|run|built|made)\b/i;
+  return owns.test(text) ? hostOf(site) : null;
+}
+
 /** The site named in the last refusal, so an owner can overrule it. */
 function lastDeclined(history: ChatMessage[]): string | null {
   for (let i = history.length - 1; i >= 0; i--) {
@@ -251,6 +170,235 @@ function lastDeclined(history: ChatMessage[]): string | null {
     if (said) return said[1]!.trim();
   }
   return null;
+}
+
+const SYSTEM = [
+  "You are Owly, an autonomous QA agent. You test websites by opening them in a real browser as a new user would.",
+  "",
+  "How you work, so you can explain it accurately:",
+  "- You attempt the site's main task (usually signing up), then check pages for broken links, layout problems on a phone, accessibility failures, keyboard traps, failing requests and security problems.",
+  "- If the owner has verified the site you also type into forms and press buttons. If not, you only READ the pages - no typing, no pressing. A read-only pass is still real work and still takes a minute or two, so never imply you will do nothing.",
+  "- You never report anything you could not reproduce. Every finding was checked again in a fresh browser first.",
+  "- You test what is behind a login by signing up as your own synthetic user.",
+  "",
+  "YOU decide what happens each turn. You have tools:",
+  "- start_test: open a site and test it.",
+  "- remember: keep a fact worth having next time - which site is theirs, what they are building, what to ignore.",
+  "Or simply reply, when talking is the right answer.",
+  "",
+  "Judgement you are expected to use, rather than rules you follow blindly:",
+  "- A test costs the person one of a few free runs a day and takes a minute or two. Spend it on something they can act on.",
+  "- A large public site - facebook.com, youtube.com, google.com - is almost certainly not theirs to change, so a report on it would be useless. Say so and offer owly-demo-rho.vercel.app instead. But if your memory says they told you it IS theirs, believe them and test it.",
+  "- If you have tested this site before, say what you found last time and offer to check whether it is fixed, instead of silently running it again as though you had never seen it.",
+  "- If they have no free tests left, do not start one. Say when it resets.",
+  "- If they name a site and ask you to check, test or look at it, and it is not a large public site, just run it. Asking them to confirm what they already said is not caution, it is friction. Ask only when it is genuinely ambiguous whether they want a test at all.",
+  "- Starting a test says nothing on its own, and the run narrates itself. But if you have tested that site before, say in one line what you found last time as you start.",
+  "- When someone tells you a site is theirs, or what they are building, or anything else you would want on the next visit, call remember. Do it in the SAME turn, alongside start_test if you are also testing.",
+  "",
+  "Absolute rules you never break:",
+  "- NEVER invent, guess at, or embellish a finding. You may only describe results you were actually given. If you have no results for a site, say you have not tested it.",
+  '- "Nothing was tested" is never "nothing is wrong", and you say so plainly.',
+  "- Your memory records that a run happened and what it found. It is not a licence to describe detail you were not given.",
+  "- You are not a general assistant. If asked something unrelated to testing their site, say briefly that this is all you do.",
+  "",
+  'How you talk: plain words, short. No emoji. No exclamation marks. No headings or bullet lists unless you are listing findings. Never pad with "Great question" or "I would be happy to". You are a competent colleague, not a chatbot.',
+].join("\n");
+
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "start_test",
+      description:
+        "Open a website in a real browser and test it. Costs the person one free test. Only call this when a test is what they want and the site is plausibly theirs to change.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The site to test, for example acme.dev or https://acme.dev/pricing" },
+          because: { type: "string", description: "One short clause on why testing this now is the right call." },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remember",
+      description: "Keep a durable fact about this person for future turns. Use for ownership of a site, what they are building, or what they want ignored.",
+      parameters: {
+        type: "object",
+        properties: {
+          fact: { type: "string", description: "The fact, in one short sentence." },
+          site_is_theirs: { type: "string", description: "A hostname they have said is theirs, if that is what this is." },
+        },
+        required: ["fact"],
+      },
+    },
+  },
+];
+
+interface Reply {
+  text: string | null;
+  calls: Array<{ name: string; args: Record<string, unknown> }>;
+}
+
+async function ask(provider: Provider, messages: Array<Record<string, unknown>>, signal?: AbortSignal): Promise<Reply | null> {
+  const key = process.env[provider.env];
+  if (!key) return null;
+
+  for (const model of provider.models) {
+    const res = await fetch(provider.url, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, messages, tools: TOOLS, tool_choice: "auto", temperature: 0.3, max_tokens: 700 }),
+      ...(signal ? { signal } : {}),
+    });
+    if (!res.ok) {
+      console.log(`chat: ${provider.name}/${model} answered ${res.status}`);
+      // A missing model is worth trying the next name for. A bad key or a
+      // spent quota is not, and hammering the list would only make it worse.
+      if (res.status === 404 || res.status === 400) continue;
+      return null;
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string; tool_calls?: Array<{ function?: { name?: string; arguments?: string } }> } }>;
+    };
+    const message = data.choices?.[0]?.message;
+    const calls: Reply["calls"] = [];
+    for (const call of message?.tool_calls ?? []) {
+      const name = call.function?.name;
+      if (!name) continue;
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(call.function?.arguments ?? "{}") as Record<string, unknown>;
+      } catch {
+        /* a malformed argument object is the same as none */
+      }
+      calls.push({ name, args });
+    }
+    const text = typeof message?.content === "string" ? message.content.trim() : "";
+    return { text: text || null, calls };
+  }
+  return null;
+}
+
+/**
+ * Work out what this turn means.
+ *
+ * Everything the model is allowed to know arrives here: the report from the
+ * run that just happened, the memory the browser is holding, and how many
+ * free tests remain. Nothing else is in scope for it.
+ */
+export async function decide(history: ChatMessage[], context: Context | string | null): Promise<ChatDecision> {
+  // The old signature passed the report text on its own. Still accepted, so
+  // a caller that has not been updated keeps working.
+  const ctx: Context =
+    context && typeof context === "object"
+      ? { report: context.report, memory: clean(context.memory), left: context.left }
+      : { report: typeof context === "string" ? context : null, memory: clean(null), left: 3 };
+
+  const last = history.filter((m) => m.role === "user").at(-1)?.content ?? "";
+  const provider = activeProvider();
+  const nothing: ChatDecision = { reply: "", test: null, remember: [], mine: null, byModel: false };
+
+  if (!provider) return withoutModel(history, last, ctx);
+
+  const messages: Array<Record<string, unknown>> = [{ role: "system", content: SYSTEM }];
+  messages.push({ role: "system", content: `What you remember about this person:\n${brief(ctx.memory)}` });
+  messages.push({
+    role: "system",
+    content:
+      ctx.left > 0
+        ? `They have ${ctx.left} free test${ctx.left === 1 ? "" : "s"} left today.`
+        : "They have no free tests left today. Do not start one; the allowance resets at midnight UTC.",
+  });
+  if (ctx.report) {
+    messages.push({
+      role: "system",
+      content: `The test you just finished produced this. It is the only thing you may describe in detail. Do not add to it.\n\n---\n${ctx.report.slice(0, 12_000)}\n---`,
+    });
+  }
+  for (const m of history.slice(-10)) messages.push({ role: m.role, content: m.content.slice(0, 4000) });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 22_000);
+  let answer: Reply | null = null;
+  try {
+    answer = await ask(provider, messages, controller.signal);
+  } catch (err) {
+    console.log(`chat: ${provider.name} failed: ${String(err).slice(0, 120)}`);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!answer) return withoutModel(history, last, ctx);
+
+  const out: ChatDecision = { ...nothing, reply: answer.text ?? "", byModel: true };
+  for (const call of answer.calls) {
+    if (call.name === "start_test" && typeof call.args.url === "string") {
+      const url = findSite(call.args.url) ?? call.args.url;
+      // The model proposes; the rules still apply. It cannot spend a test the
+      // person does not have, and it cannot talk itself past the well-known
+      // check unless memory says the person claimed the site.
+      if (ctx.left <= 0) continue;
+      if (wellKnown(url) && !ctx.memory.mine.includes(hostOf(url))) continue;
+      out.test = url;
+    }
+    if (call.name === "remember") {
+      if (typeof call.args.fact === "string" && call.args.fact.trim()) out.remember.push(call.args.fact.trim().slice(0, 300));
+      if (typeof call.args.site_is_theirs === "string" && call.args.site_is_theirs.trim()) out.mine = hostOf(call.args.site_is_theirs);
+    }
+  }
+
+  // A tool call with nothing said alongside it is fine for a test, because
+  // the run narrates itself. Remembering something silently is not: the
+  // generic "paste a web address" that used to come out here was a non
+  // sequitur after someone had just told Owly about their product.
+  if (!out.reply && !out.test) {
+    if (out.mine) out.reply = `Noted - ${out.mine} is yours. Say the word and I will test it.`;
+    else if (out.remember.length) out.reply = "Noted, I will remember that.";
+    else out.reply = fallback(last, ctx.report);
+  }
+
+  // A safety net under the model's memory, not a replacement for it. Models
+  // forget to call tools; "acme.dev is my site" is unambiguous enough that
+  // Owly should not need one to be told to have noticed.
+  if (!out.mine) {
+    const claimed = ownershipClaim(last);
+    if (claimed) out.mine = claimed;
+  }
+  return out;
+}
+
+/**
+ * The same decisions, made by rules, for when there is no model configured.
+ * Less clever, never wrong in a way that costs someone a test.
+ */
+function withoutModel(history: ChatMessage[], last: string, ctx: Context): ChatDecision {
+  const base: ChatDecision = { reply: "", test: null, remember: [], mine: null, byModel: false };
+  const site = findSite(last);
+
+  if (site) {
+    if (ctx.left <= 0) {
+      return { ...base, reply: "That is today's free tests used up. They reset at midnight UTC." };
+    }
+    if (wellKnown(site) && !ctx.memory.mine.includes(hostOf(site))) {
+      return { ...base, reply: notYours(site)! };
+    }
+    // A report already on screen means a question that names the site is
+    // almost certainly ABOUT that report. With no model to tell the
+    // difference, the cheap reading is the safe one: never spend a second
+    // test to answer what might be a question about the first.
+    if (ctx.report) return { ...base, reply: fallback(last, ctx.report) };
+    return { ...base, test: site };
+  }
+
+  if (MINE.test(last)) {
+    const declined = lastDeclined(history);
+    if (declined) return { ...base, test: declined, mine: hostOf(declined) };
+  }
+
+  return { ...base, reply: fallback(last, ctx.report) };
 }
 
 /** What Owly says when there is no model, or the model did not answer. */

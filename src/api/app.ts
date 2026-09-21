@@ -24,6 +24,7 @@ import type { Store, StoredRun } from "../store.js";
 import { ACTIONS, AGENT_VERSION, manifest, MAX_REQUEST_BYTES, PROTOCOL_VERSION } from "./manifest.js";
 import { Invalid, validate } from "./params.js";
 import { decide, type ChatMessage } from "./chat.js";
+import { clean } from "./memory.js";
 
 export interface AppDeps {
   store: Store;
@@ -334,9 +335,23 @@ export function createApp(deps: AppDeps, advanceRun?: AdvanceFn): Hono {
       return c.json({ reply: "That is enough talking for today. The tests themselves still work from the box below tomorrow.", test: null, by_model: false });
     }
 
+    // How many tests are left is the server's business, not the tab's: the
+    // model is told the real number so it cannot cheerfully offer a run that
+    // is about to be refused.
+    const spent = await deps.store.peek(`try:${day}:${who}`);
     const reportText = typeof body.report === "string" ? body.report.slice(0, 20_000) : null;
-    const decision = await decide(history, reportText);
-    return c.json({ reply: decision.reply, test: decision.test, by_model: decision.byModel });
+    const decision = await decide(history, {
+      report: reportText,
+      memory: clean(body.memory),
+      left: Math.max(0, TRY_PER_VISITOR - spent),
+    });
+    return c.json({
+      reply: decision.reply,
+      test: decision.test,
+      remember: decision.remember,
+      mine: decision.mine,
+      by_model: decision.byModel,
+    });
   });
 
   const reportPageRoute = async (c: Context) => {

@@ -47,6 +47,10 @@ export interface Store {
    * need a count that actually goes up, atomically, across instances.
    */
   bump(key: string): Promise<number>;
+
+  /** Read a counter without touching it. Used to TELL someone their limit
+   *  rather than to spend it. */
+  peek(key: string): Promise<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +113,10 @@ export class MemoryStore implements Store {
     const next = (this.counters.get(key) ?? 0) + 1;
     this.counters.set(key, next);
     return next;
+  }
+
+  async peek(key: string): Promise<number> {
+    return this.counters.get(key) ?? 0;
   }
 
   private copy(r: StoredRun): StoredRun {
@@ -248,6 +256,12 @@ export async function neonStore(databaseUrl: string): Promise<Store> {
                 ON CONFLICT (key) DO UPDATE SET n = owly_counters.n + 1, updated_at = now()
                 RETURNING n`) as Array<{ n: number }>;
       return Number(rows[0]?.n ?? 1);
+    },
+
+    async peek(key) {
+      await ensure();
+      const rows = (await sql`SELECT n FROM owly_counters WHERE key = ${key}`) as Array<{ n: number }>;
+      return Number(rows[0]?.n ?? 0);
     },
   };
 }

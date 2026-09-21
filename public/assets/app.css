@@ -510,3 +510,21 @@ form.box textarea::placeholder { color: var(--faint); }
   .col { padding: 0 14px; }
   body { font-size: 16px; }
 }
+
+/*
+ * "Since the last run: 2 fixed, 1 still there." Owly can only say this
+ * because it now remembers the previous run of the same site, which is the
+ * whole point of giving it a memory.
+ */
+.since {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--muted);
+  padding: 9px 14px;
+  margin-bottom: 10px;
+  border: 1px dashed var(--edge);
+  border-radius: 12px;
+}
+.since .dot-good { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }

@@ -88,6 +88,114 @@
   var KEY = "owly-chats";
   var chat = null;
 
+  /**
+   * What Owly knows between one question and the next.
+   *
+   * Kept in the browser on purpose: Owly has no accounts, and a server-side
+   * profile keyed on someone's IP address would be worse privacy AND worse
+   * identity. The person's own machine holds their own history; the server
+   * reasons over whatever is sent with the turn.
+   */
+  var MEM = "owly-memory";
+
+  function memory() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(MEM) || "{}");
+      return {
+        mine: Array.isArray(raw.mine) ? raw.mine : [],
+        runs: Array.isArray(raw.runs) ? raw.runs : [],
+        facts: Array.isArray(raw.facts) ? raw.facts : [],
+      };
+    } catch (err) {
+      return { mine: [], runs: [], facts: [] };
+    }
+  }
+
+  function saveMemory(m) {
+    try {
+      // Newest first, and bounded: a browser store is not an archive.
+      m.runs = m.runs.slice(0, 40);
+      m.mine = m.mine.slice(0, 40);
+      m.facts = m.facts.slice(0, 30);
+      localStorage.setItem(MEM, JSON.stringify(m));
+    } catch (err) {
+      /* private window or full: Owly simply forgets, which is survivable */
+    }
+  }
+
+  function hostOf(value) {
+    return String(value || "")
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .split("/")[0]
+      .split(":")[0]
+      .replace(/^www\./i, "")
+      .toLowerCase();
+  }
+
+  /** Remember that a run happened, and what it found. */
+  function rememberRun(site, summary) {
+    var m = memory();
+    m.runs.unshift({
+      site: hostOf(site),
+      at: new Date().toISOString(),
+      mode: summary.mode || "passive",
+      headline: summary.headline || "",
+      findings: (summary.findings || []).map(function (f) {
+        return { severity: f.severity, title: f.title };
+      }),
+    });
+    saveMemory(m);
+  }
+
+  function rememberFacts(facts, mine) {
+    if ((!facts || !facts.length) && !mine) return;
+    var m = memory();
+    (facts || []).forEach(function (f) {
+      if (f && m.facts.indexOf(f) < 0) m.facts.unshift(f);
+    });
+    if (mine && m.mine.indexOf(hostOf(mine)) < 0) m.mine.unshift(hostOf(mine));
+    saveMemory(m);
+  }
+
+  /**
+   * What changed since the last run of this site.
+   *
+   * Matched on severity and title, because that is what a person reads and
+   * what they would call "the same bug". Returns null the first time a site
+   * is seen, which is the honest answer to "did I fix it".
+   */
+  function changeSince(site, findings) {
+    var host = hostOf(site);
+    var previous = memory().runs.filter(function (r) {
+      return r.site === host;
+    })[0];
+    if (!previous) return null;
+
+    var key = function (f) {
+      return (f.severity + "|" + f.title).toLowerCase();
+    };
+    var before = {};
+    (previous.findings || []).forEach(function (f) {
+      before[key(f)] = f;
+    });
+    var now = {};
+    (findings || []).forEach(function (f) {
+      now[key(f)] = f;
+    });
+
+    var fixed = Object.keys(before).filter(function (k) {
+      return !now[k];
+    });
+    var still = Object.keys(now).filter(function (k) {
+      return before[k];
+    });
+    var fresh = Object.keys(now).filter(function (k) {
+      return !before[k];
+    });
+    return { fixed: fixed.length, still: still.length, fresh: fresh.length, at: previous.at };
+  }
+
   function load() {
     try {
       var raw = localStorage.getItem(KEY);
@@ -178,6 +286,12 @@
         box.appendChild(work);
       }
       box.appendChild(card(t.summary, t.url));
+      if (t.since) {
+        var strip = el("div", "since");
+        strip.appendChild(el("span", "dot-good", ""));
+        strip.appendChild(el("span", "", esc(t.since)));
+        box.appendChild(strip);
+      }
       lastReport = t.context || null;
     }
   }
@@ -378,7 +492,7 @@
       var res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: historyForModel(), report: lastReport }),
+        body: JSON.stringify({ messages: historyForModel(), report: lastReport, memory: memory() }),
       });
       data = await res.json();
     } catch (err) {
@@ -389,6 +503,11 @@
     }
 
     waiting.parentNode.remove();
+
+    // Anything Owly decided was worth keeping, kept.
+    if (data) rememberFacts(data.remember, data.mine);
+
+    if (data && data.reply && data.test) say(data.reply);
 
     if (data && data.test) {
       await runTest(data.test);
@@ -548,7 +667,7 @@
 
       if (data.status === "completed") {
         done();
-        return finish(box, data.summary, body.report_url, notes);
+        return finish(box, data.summary, body.report_url, notes, body.target || site);
       }
       if (data.status === "failed") {
         done();
@@ -615,12 +734,39 @@
     );
   }
 
-  function finish(box, summary, reportUrl, notes) {
+  /**
+   * "Did I fix it?" - answerable at last, because Owly now remembers the
+   * last run of this site. Worked out BEFORE this run is recorded, or it
+   * would be comparing the run against itself.
+   */
+  function sinceLine(change) {
+    if (!change) return null;
+    var bits = [];
+    if (change.fixed) bits.push(change.fixed + " fixed");
+    if (change.still) bits.push(change.still + (change.still === 1 ? " still there" : " still there"));
+    if (change.fresh) bits.push(change.fresh + " new");
+    var when = String(change.at).slice(0, 10);
+    if (!bits.length) return "Same as the run on " + when + ": nothing found either time.";
+    return "Since " + when + ": " + bits.join(", ") + ".";
+  }
+
+  function finish(box, summary, reportUrl, notes, site) {
     if (!summary) {
       box.appendChild(links(reportUrl, false));
       return;
     }
+
+    var change = changeSince(site, summary.findings || []);
+    rememberRun(site, summary);
+
     box.appendChild(card(summary, reportUrl));
+    var line = sinceLine(change);
+    if (line) {
+      var strip = el("div", "since");
+      strip.appendChild(el("span", "dot-good", ""));
+      strip.appendChild(el("span", "", esc(line)));
+      box.appendChild(strip);
+    }
 
     var context = [
       summary.headline,
@@ -636,7 +782,7 @@
       .filter(Boolean)
       .join("\n");
     lastReport = context;
-    remember({ role: "report", summary: summary, url: reportUrl, notes: notes, context: context });
+    remember({ role: "report", summary: summary, url: reportUrl, notes: notes, context: context, since: line });
     toBottom();
   }
 
