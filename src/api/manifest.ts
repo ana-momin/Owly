@@ -16,7 +16,7 @@
 import type { InputSchema } from "./params.js";
 
 export const PROTOCOL_VERSION = "1.0";
-export const AGENT_VERSION = "2026.09.20";
+export const AGENT_VERSION = "2026.09.21";
 export const MAX_REQUEST_BYTES = 262_144;
 
 export const FOCUS = ["everything", "forms", "mobile", "accessibility"] as const;
@@ -131,13 +131,27 @@ export function manifest(): Record<string, unknown> {
           description: "Five tests a month. Each finished test counts once, however many issues it finds.",
           sort_order: 1,
         },
+        {
+          name: "Nest",
+          pricing_model: "subscription",
+          // Minor units: $12.00. The site's pricing page quotes the same
+          // number, and the two have to agree - someone reading one and
+          // being charged the other is the fastest way to lose them.
+          amount_minor: 1200,
+          billing_interval: "month",
+          usage_unit: "result",
+          included_units: 60,
+          description: "Sixty tests a month. A test that could not open your site is not a result and is not counted.",
+          sort_order: 2,
+        },
       ],
       faqs: [
         {
           question: "Is this AI?",
           answer:
             "<p>Not in its checks. Owly runs rule-based checks and scripted user behaviour in a real browser, and every issue it reports comes from something the browser recorded. " +
-            "The chat you use to talk to it is Pond's.</p>",
+            "There is a model in the conversation - here, and on Owly's own site - and it is fenced off from the testing: it can explain a report and it can ask for a test to be started, " +
+            "but it cannot start one and it is never the source of a finding. Ask about a site it has not tested and it will say it has not tested it, rather than guessing.</p>",
         },
         {
           question: "What is the difference between a full test and a passive scan?",

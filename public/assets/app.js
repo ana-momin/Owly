@@ -22,8 +22,21 @@
   var form = document.getElementById("composer");
   var input = document.getElementById("say");
   var send = document.getElementById("send");
-  var suggest = document.getElementById("suggest");
+  var leftChip = document.getElementById("left");
   if (!scroll || !thread || !form || !input || !send) return;
+
+  /**
+   * How many free tests are left today. The server is the authority and says
+   * so on every start; this only reflects what it last said, so the number is
+   * never a guess made in the tab.
+   */
+  function setLeft(n) {
+    if (!leftChip) return;
+    var b = leftChip.querySelector("b");
+    if (b) b.textContent = String(Math.max(0, n));
+    leftChip.classList.toggle("none", n <= 0);
+    leftChip.lastChild.textContent = n === 1 ? " left today" : " left today";
+  }
 
   var busy = false;
   var history = [];
@@ -55,7 +68,6 @@
   function began() {
     if (hello && !hello.hidden) {
       hello.hidden = true;
-      if (suggest) suggest.hidden = true;
       scroll.classList.remove("empty");
     }
   }
@@ -163,13 +175,6 @@
     turn(text);
   });
 
-  if (suggest) {
-    suggest.addEventListener("click", function (e) {
-      var b = e.target.closest("button");
-      if (!b || busy) return;
-      turn(b.getAttribute("data-say") || b.textContent.trim());
-    });
-  }
 
   /* ---------------------------------------------------------------- a turn */
 
@@ -302,12 +307,44 @@
     if (!res.ok || !body.id) {
       done();
       var why = (body && body.error && body.error.message) || "I could not start that test.";
-      live.box.innerHTML = '<p class="oops">' + esc(why) + "</p>";
       if (body && body.error && body.error.code === "rate_limited") {
-        live.box.innerHTML += '<p>Owly is also on <a href="https://joinpond.ai" rel="noopener">Pond</a>, with its own free tier.</p>';
+        // Running out is not an error the way a broken address is: the answer
+        // is a door, not a red line. So it gets the same card a finished run
+        // gets, with somewhere to go.
+        setLeft(0);
+        live.box.innerHTML = "";
+        var out = el("div", "result");
+        out.appendChild(
+          el(
+            "div",
+            "head",
+            "<h2>That is today's free tests used up</h2>" +
+              '<div class="sub">The site gives 3 a day so one visitor cannot spend the whole budget. It resets at midnight UTC.</div>',
+          ),
+        );
+        out.appendChild(
+          el(
+            "div",
+            "body",
+            "<p>Owly is also on Pond, where it has its own free tier and no daily cap &mdash; that is the same agent, with the full test rather than a look.</p>",
+          ),
+        );
+        var foot = el("div", "foot");
+        var pond = el("a", "linkish primary", "Use Owly on Pond");
+        pond.href = "https://joinpond.ai";
+        pond.rel = "noopener";
+        foot.appendChild(pond);
+        var plans = el("a", "linkish", "See the plans");
+        plans.href = "/pricing";
+        foot.appendChild(plans);
+        out.appendChild(foot);
+        live.box.appendChild(out);
+        return;
       }
+      live.box.innerHTML = '<p class="oops">' + esc(why) + "</p>";
       return;
     }
+    if (typeof body.left === "number") setLeft(body.left);
 
     var host = body.target;
     try {

@@ -15,12 +15,17 @@ import { app as d } from "./apps/d-flaky.js";
 import { app as e } from "./apps/e-accessibility.js";
 import { app as f } from "./apps/f-checkout.js";
 import { app as g, userLookup } from "./apps/g-clean.js";
-import { app as h, EXFIL_PORT } from "./apps/h-injection.js";
+import { app as h, EXFIL_PORT, setExfilPort } from "./apps/h-injection.js";
 import { app as i, reset as resetAccounts } from "./apps/i-account.js";
 import { html, json, page, type Ctx, type LabApp } from "./kit.js";
 
 export const APPS: LabApp[] = [a, b, c, d, e, f, g, h, i];
 export const HOST = "127.0.0.1";
+
+/** The address of the exfiltration trap, once the lab is running. */
+export function exfilUrl(): string {
+  return `http://${HOST}:${EXFIL_PORT}/`;
+}
 
 export function appUrl(key: string): string {
   const found = APPS.find((x) => x.key === key);
@@ -93,19 +98,40 @@ export interface Lab {
   reset: () => Promise<void>;
 }
 
+/**
+ * Every app on a port of its own, chosen by the operating system.
+ *
+ * The ports used to be fixed, which meant two test files could not hold a lab
+ * at the same time - so the whole suite ran one file after another and took
+ * half an hour. Asking for port 0 and reading back what was given lets every
+ * file have its own lab, and the suite run in parallel.
+ *
+ * `app.port` is written back so `appUrl` keeps working unchanged. That is
+ * module state, which is safe here precisely because each test file gets its
+ * own worker, and so its own copy of this module.
+ */
 export async function startLab(): Promise<Lab> {
   const servers: Server[] = [...APPS.map(serveApp), serveExfil()];
-  const ports = [...APPS.map((x) => x.port), EXFIL_PORT];
 
   await Promise.all(
     servers.map(
-      (s, i) =>
+      (s) =>
         new Promise<void>((resolve, reject) => {
           s.once("error", reject);
-          s.listen(ports[i], HOST, () => resolve());
+          s.listen(0, HOST, () => resolve());
         }),
     ),
   );
+
+  const portOf = (s: Server): number => {
+    const address = s.address();
+    if (!address || typeof address === "string") throw new Error("lab server did not report a port");
+    return address.port;
+  };
+  APPS.forEach((app, i) => {
+    app.port = portOf(servers[i]!);
+  });
+  setExfilPort(portOf(servers[servers.length - 1]!));
 
   return {
     close: () =>

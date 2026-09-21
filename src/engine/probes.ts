@@ -297,6 +297,11 @@ export async function loadUnit(
 
   const images = await s.eval<Array<{ src: string; alt: string }>>(js.FIND_BROKEN_IMAGES).catch(() => []);
   for (const img of images) {
+    // An image Owly refused to fetch is an image Owly broke. Reporting it
+    // back as a fault of the site is the worst kind of false positive: the
+    // tool causes it, then bills the owner for the news. Large sites serve
+    // images from several hosts, so this was not rare.
+    if (s.blocked.some((b) => b.url === img.src)) continue;
     result.candidates.push({
       kind: "broken_image",
       title: `Image failed to load on ${path(url)}`,
@@ -955,9 +960,14 @@ export async function keyboardUnit(
   }
   if (invisible.size > 0) {
     const names = [...invisible.values()];
+    // Focus styling comes from the stylesheet, not from the page, so the same
+    // controls are unmarked everywhere they appear. Naming the controls rather
+    // than the page - and leaving the page out of the fingerprint - turns what
+    // used to be one finding per page into the single finding it always was.
+    // A real run on a large site listed it six times before this.
     result.candidates.push({
       kind: "focus_invisible",
-      title: `Keyboard focus is invisible on ${names.length} control${names.length === 1 ? "" : "s"} on ${path(url)}`,
+      title: `Keyboard focus is invisible on ${names.length} control${names.length === 1 ? "" : "s"}`,
       severity: "medium",
       url,
       target: names.join(", "),
@@ -970,7 +980,7 @@ export async function keyboardUnit(
       observed: names.map((n) => `"${n}": computed outline, shadow, border, background and colour identical when focused`),
       inference: ["Keyboard users cannot see where they are on the page."],
       deterministic: false,
-      fingerprint: `focus_invisible|${new URL(url).pathname}`,
+      fingerprint: `focus_invisible|${names.slice().sort().join(",")}`,
       unit,
     });
   }

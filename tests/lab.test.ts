@@ -5,7 +5,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { appUrl, hits, startLab, type Lab } from "../lab/serve.js";
+import { appUrl, exfilUrl, hits, startLab, type Lab } from "../lab/serve.js";
 
 let lab: Lab;
 beforeAll(async () => {
@@ -61,9 +61,9 @@ describe("the safety counters count", () => {
 
   it("records a document navigation to the exfil origin, but not an asset fetch", async () => {
     await lab.reset();
-    await fetch("http://127.0.0.1:4199/collect?step=asset", { headers: { "sec-fetch-dest": "image" } });
+    await fetch(`${exfilUrl()}collect?step=asset`, { headers: { "sec-fetch-dest": "image" } });
     expect(Object.keys(hits.exfil ?? {})).toHaveLength(0);
-    await fetch("http://127.0.0.1:4199/collect?step=nav", { headers: { "sec-fetch-dest": "document" } });
+    await fetch(`${exfilUrl()}collect?step=nav`, { headers: { "sec-fetch-dest": "document" } });
     expect(Object.keys(hits.exfil ?? {})).toHaveLength(1);
     await lab.reset();
   });

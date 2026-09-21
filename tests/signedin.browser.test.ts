@@ -21,7 +21,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PERSONAS, Session } from "../src/browser/session.js";
 import { advance } from "../src/engine/machine.js";
 import { newRun } from "../src/engine/plan.js";
-import { runTest } from "../src/engine/run.js";
+import { runOnce } from "./shared-run.js";
 import { appUrl, startLab, type Lab } from "../lab/serve.js";
 
 let lab: Lab;
@@ -92,7 +92,7 @@ describe("a product with a login", () => {
   }, 300_000);
 
   it("says so in the report, without putting the cookies in it", async () => {
-    const report = await runTest(appUrl("i"), { allowPrivate: true });
+    const report = await runOnce(appUrl("i"), { allowPrivate: true });
     expect(report.signedInBy).toBeTruthy();
     // The report is stored and rendered. Credentials must not be in it.
     expect(JSON.stringify(report)).not.toMatch(/"cookies"/);
@@ -108,7 +108,7 @@ describe("a product with a login", () => {
  */
 describe("checking that a change actually stuck", () => {
   it("finds a save that says it worked and did not", async () => {
-    const report = await runTest(appUrl("i"), { allowPrivate: true });
+    const report = await runOnce(appUrl("i"), { allowPrivate: true });
     const lost = report.findings.find((f) => f.kind === "lost_write");
 
     expect(lost, `findings were: ${report.findings.map((f) => f.kind).join(", ") || "none"}`).toBeDefined();
@@ -119,7 +119,7 @@ describe("checking that a change actually stuck", () => {
   }, 400_000);
 
   it("says nothing of the kind about a product that saves properly", async () => {
-    const report = await runTest(appUrl("g"), { allowPrivate: true });
+    const report = await runOnce(appUrl("g"), { allowPrivate: true });
     expect(report.findings.some((f) => f.kind === "lost_write")).toBe(false);
   }, 400_000);
 });
@@ -132,7 +132,7 @@ describe("checking that a change actually stuck", () => {
  */
 describe("pressing the button twice", () => {
   it("is reported when the app accepts both presses", async () => {
-    const report = await runTest(appUrl("i"), { allowPrivate: true });
+    const report = await runOnce(appUrl("i"), { allowPrivate: true });
     const dup = report.findings.find((f) => f.kind === "duplicate_on_double_submit");
 
     expect(dup, `findings were: ${report.findings.map((f) => f.kind).join(", ") || "none"}`).toBeDefined();
@@ -141,7 +141,7 @@ describe("pressing the button twice", () => {
   }, 400_000);
 
   it("is not reported about an app that only takes the first press", async () => {
-    const report = await runTest(appUrl("g"), { allowPrivate: true });
+    const report = await runOnce(appUrl("g"), { allowPrivate: true });
     expect(report.findings.some((f) => f.kind === "duplicate_on_double_submit")).toBe(false);
   }, 400_000);
 });

@@ -28,8 +28,8 @@
   --body: "Nunito Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --r: 26px;
-  --col: 46rem;
+  --r: 28px;
+  --col: 52rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -300,11 +300,12 @@ main:has(.scroll.empty) { justify-content: center; padding-bottom: 7vh; }
 form.box {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px;
+  min-height: 78px;
   background: var(--surface);
   border: 1px solid var(--edge);
   border-radius: var(--r);
-  padding: 8px 8px 8px 18px;
+  padding: 10px 10px 10px 22px;
   transition: border-color .14s ease, box-shadow .14s ease;
 }
 form.box:focus-within {
@@ -342,31 +343,32 @@ form.box textarea::placeholder { color: var(--faint); }
 .send:disabled { opacity: .28; cursor: default; }
 .send.stop { background: var(--bad); }
 
-.hint {
-  margin: 9px 0 0;
-  text-align: center;
-  font-size: 12.5px;
-  color: var(--faint);
+/*
+ * Under the box. Two small facts, carried by an icon each, instead of the
+ * sentence of small print that used to sit here - the page is meant to look
+ * like somewhere you type, not somewhere you read terms.
+ */
+.meta {
+  margin: 10px 0 0;
   display: flex;
   justify-content: center;
-  gap: 7px;
+  gap: 6px;
   flex-wrap: wrap;
 }
-.hint a { color: var(--muted); }
-.hint .sep { opacity: .45; }
-
-.suggest { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 16px 0 0; }
-.suggest button {
-  font: inherit;
-  font-size: 14px;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid var(--edge);
+.meta .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--faint);
+  text-decoration: none;
+  padding: 5px 11px;
   border-radius: 999px;
-  padding: 8px 15px;
-  cursor: pointer;
 }
-.suggest button:hover { color: var(--ink); background: var(--edge-soft); border-color: var(--edge); }
+.meta .chip:hover { color: var(--muted); background: var(--edge-soft); }
+.meta .chip svg { width: 13px; height: 13px; opacity: .8; }
+.meta .chip b { font-weight: 700; color: var(--muted); }
+.meta .chip.none b { color: var(--bad); }
 
 .oops { color: var(--bad); font-size: 15px; }
 

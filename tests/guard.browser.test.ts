@@ -10,14 +10,17 @@
 import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PERSONAS, Session } from "../src/browser/session.js";
-import { appUrl, hits, startLab, type Lab } from "../lab/serve.js";
+import { appUrl, exfilUrl, hits, startLab, type Lab } from "../lab/serve.js";
 
 let lab: Lab;
 let browser: Browser;
-const target = new URL(appUrl("h"));
+// Resolved after the lab is listening, never at import time: the lab takes
+// whatever ports the OS gives it, so there is no address to read until then.
+let target: URL;
 
 beforeAll(async () => {
   lab = await startLab();
+  target = new URL(appUrl("h"));
   browser = await chromium.launch({ headless: true });
 });
 afterAll(async () => {
@@ -49,7 +52,7 @@ describe("the page's own redirect off-origin", () => {
     await s.page.waitForTimeout(2_000);
     await s.close();
     expect(exfilHits()).toBe(0);
-    expect(s.blocked.some((b) => b.url.includes(":4199") && /navigation away/.test(b.reason))).toBe(true);
+    expect(s.blocked.some((b) => b.url.startsWith(exfilUrl()) && /navigation away/.test(b.reason))).toBe(true);
   });
 
   it("leaves the real page in place, not a browser error page", async () => {
@@ -69,10 +72,16 @@ describe("the page's own redirect off-origin", () => {
   });
 });
 
+// These two attacks are about the link and the form. The page also drives
+// itself off-origin 250ms after load, which is a THIRD attack with its own
+// test above - and which, on a busy machine, got there first and made these
+// controls fail for a reason that had nothing to do with them.
+const noAuto = () => new URL("?noauto=1", target).href;
+
 describe("a link pointing off-origin, clicked anyway", () => {
   it("reaches the exfil origin in an unguarded browser", async () => {
     const page = await browser.newPage();
-    await page.goto(target.href);
+    await page.goto(noAuto());
     await page.getByRole("link", { name: "Continue testing here" }).click();
     // Waiting a fixed 500ms for a cross-origin request made this control flaky
     // on a loaded machine, and a flaky control is worse than no control.
@@ -82,7 +91,7 @@ describe("a link pointing off-origin, clicked anyway", () => {
 
   it("is refused in Owly's session even when forced", async () => {
     const s = await owly();
-    await s.goto(target.href, 200);
+    await s.goto(noAuto(), 200);
     await s.page.getByRole("link", { name: "Continue testing here" }).click({ noWaitAfter: true }).catch(() => undefined);
     await s.page.waitForTimeout(500);
     await s.close();
@@ -93,7 +102,7 @@ describe("a link pointing off-origin, clicked anyway", () => {
 describe("a form that posts off-origin, submitted anyway", () => {
   it("reaches the exfil origin in an unguarded browser", async () => {
     const page = await browser.newPage();
-    await page.goto(target.href);
+    await page.goto(noAuto());
     await page.getByRole("button", { name: "Ask" }).click();
     await expect.poll(() => exfilHits(), { timeout: 10_000 }).toBeGreaterThan(0);
     await page.close();
@@ -101,7 +110,7 @@ describe("a form that posts off-origin, submitted anyway", () => {
 
   it("is refused in Owly's session even when forced", async () => {
     const s = await owly();
-    await s.goto(target.href, 200);
+    await s.goto(noAuto(), 200);
     await s.page.getByRole("button", { name: "Ask" }).click({ noWaitAfter: true }).catch(() => undefined);
     await s.page.waitForTimeout(500);
     await s.close();
@@ -120,9 +129,10 @@ describe("the SSRF guard inside the browser", () => {
       userAgentSuffix: "OwlyQA/test",
     });
     await strict.page.setContent("<p>probe</p>");
-    await strict.page.evaluate("fetch('http://127.0.0.1:4107/').catch(function () {})");
+    const loopback = appUrl("g");
+    await strict.page.evaluate(`fetch(${JSON.stringify(loopback)}).catch(function () {})`);
     await strict.page.waitForTimeout(500);
     await strict.close();
-    expect(strict.blocked.some((b) => b.url.startsWith("http://127.0.0.1:4107") && /loopback/.test(b.reason))).toBe(true);
+    expect(strict.blocked.some((b) => b.url.startsWith(loopback) && /loopback/.test(b.reason))).toBe(true);
   });
 });

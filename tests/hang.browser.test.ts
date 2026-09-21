@@ -12,8 +12,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { advance, newRun, type RunState } from "../src/engine/machine.js";
 
 let server: Server;
-const PORT = 4190;
-const base = `http://127.0.0.1:${PORT}/`;
+// An ephemeral port, so this file can run beside the ones holding a lab.
+let base: string;
 
 beforeAll(async () => {
   server = createServer((req, res) => {
@@ -25,7 +25,10 @@ beforeAll(async () => {
     }
     res.end(`<!doctype html><html lang="en"><head><title>Home</title></head><body><main><h1>Home</h1><p><a href="/stuck">A page that hangs</a></p></main></body></html>`);
   });
-  await new Promise<void>((r) => server.listen(PORT, "127.0.0.1", () => r()));
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("no port");
+  base = `http://127.0.0.1:${address.port}/`;
 });
 
 afterAll(async () => {

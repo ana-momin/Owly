@@ -7,9 +7,15 @@ export default defineConfig({
     // a mocked browser would pass while the real one failed.
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    // One file at a time. Several files start the lab, and the lab's apps
-    // live on fixed ports so each is its own origin; run in parallel, they
-    // collided and whole files failed to start.
-    fileParallelism: false,
+    // Files run in parallel. The lab used to sit on fixed ports, so two files
+    // could not hold one at once and the whole suite ran end to end - half an
+    // hour to learn whether a one-line change was safe, which meant it got run
+    // less often than it should have been. The lab now takes whatever ports
+    // the OS gives it, so each file gets its own.
+    //
+    // Capped, because every worker may also be driving a Chromium: past about
+    // four they compete for the machine and the wall-clock saving stops.
+    maxWorkers: 4,
+    minWorkers: 1,
   },
 });
