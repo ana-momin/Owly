@@ -55,6 +55,7 @@
   var ICON = {
     copy: svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>'),
     good: svg('<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3zM7 10l4-7a2 2 0 0 1 3 2l-1 5h5a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 16.8 21H7"/>'),
+    tick: svg('<path d="M20 6 9 17l-5-5"/>'),
     bad: svg('<path d="M17 14V3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3zM17 14l-4 7a2 2 0 0 1-3-2l1-5H6a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 7.2 3H17"/>'),
   };
 
@@ -65,6 +66,9 @@
     stick = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 90;
   });
   function toBottom(force) {
+    // Belt and braces: the empty state stops the thread scrolling, so a
+    // thread with anything in it must never still be wearing that class.
+    if (thread.children.length && scroll.classList.contains("empty")) began();
     if (!stick && !force) return;
     // After the next paint: a block added this tick has no height yet, so
     // scrolling now would stop just short and look stuck.
@@ -224,26 +228,43 @@
   function actions(box, text) {
     var row = el("div", "acts");
 
+    var said = el("span", "said");
+
+    /** Say something briefly, and let the button kick as it is pressed. */
+    function answer(button, words) {
+      button.classList.remove("pop");
+      // Reading offsetWidth restarts the animation when the same button is
+      // pressed twice; without it the second press is silent.
+      void button.offsetWidth;
+      button.classList.add("pop");
+      said.textContent = words;
+      said.classList.add("show");
+      clearTimeout(answer.timer);
+      answer.timer = setTimeout(function () {
+        said.classList.remove("show");
+      }, 1700);
+    }
+
     var copy = el("button", null, ICON.copy);
     copy.type = "button";
     copy.title = "Copy";
     copy.setAttribute("aria-label", "Copy this answer");
-    var said = el("span", "said");
     copy.addEventListener("click", function () {
-      var done = function () {
-        said.textContent = "Copied";
-        row.classList.add("stuck");
+      var ok = function () {
+        copy.classList.add("copied");
+        copy.innerHTML = ICON.tick;
+        answer(copy, "Copied");
         setTimeout(function () {
-          said.textContent = "";
-          row.classList.remove("stuck");
-        }, 1600);
+          copy.classList.remove("copied");
+          copy.innerHTML = ICON.copy;
+        }, 1700);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, function () {
-          said.textContent = "Could not copy";
+        navigator.clipboard.writeText(text).then(ok, function () {
+          answer(copy, "Could not copy");
         });
       } else {
-        said.textContent = "Could not copy";
+        answer(copy, "Could not copy");
       }
     });
     row.appendChild(copy);
@@ -255,16 +276,17 @@
       b.setAttribute("aria-label", b.title);
       b.addEventListener("click", function () {
         var already = b.classList.contains("on");
-        row.querySelectorAll("button.on").forEach(function (x) {
+        Array.prototype.forEach.call(row.querySelectorAll("button.on"), function (x) {
           x.classList.remove("on");
         });
-        if (!already) b.classList.add("on");
-        said.textContent = already ? "" : "Noted";
-        row.classList.add("stuck");
-        setTimeout(function () {
-          said.textContent = "";
-          row.classList.remove("stuck");
-        }, 1600);
+        if (already) {
+          answer(b, "");
+          return;
+        }
+        b.classList.add("on");
+        // Honest about where this goes: nowhere. Saying "Thanks" would imply
+        // a rating had been sent to somebody.
+        answer(b, kind === "good" ? "Noted" : "Noted - it stays in this browser");
       });
       row.appendChild(b);
     });
@@ -694,7 +716,7 @@
       turn("What can I ask you, and what do you check?");
     });
 
-  var toggle = document.getElementById("theme");
+  var toggle = document.getElementById("theme") || document.getElementById("theme-rail");
   if (toggle)
     toggle.addEventListener("click", function () {
       var dark = root.getAttribute("data-theme") === "dark" || (!root.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);

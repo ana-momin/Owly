@@ -27,6 +27,38 @@ describe("spotting a site in a sentence", () => {
   });
 });
 
+describe("sites that are obviously not yours", () => {
+  it("declines them instead of spending a test on a site you cannot change", async () => {
+    for (const site of ["facebook.com", "x.ai", "www.youtube.com/feed", "google.co.uk"]) {
+      const out = await decide([{ role: "user", content: site }], null);
+      expect(out.test, `${site} should not be tested`).toBeNull();
+      expect(out.reply).toMatch(/not yours/i);
+    }
+  });
+
+  it("still tests a small site nobody has heard of", async () => {
+    // The failure that would really hurt: telling someone their own product
+    // is not theirs. Anything not on the short list gets tested.
+    for (const site of ["acme.dev", "mycoolstartup.io", "owly-demo-rho.vercel.app", "tryowly.vercel.app"]) {
+      const out = await decide([{ role: "user", content: site }], null);
+      expect(out.test, `${site} should be tested`).toBe(site);
+    }
+  });
+
+  it("lets the owner overrule the guess", async () => {
+    const first = await decide([{ role: "user", content: "facebook.com" }], null);
+    const then = await decide(
+      [
+        { role: "user", content: "facebook.com" },
+        { role: "assistant", content: first.reply },
+        { role: "user", content: "it's mine" },
+      ],
+      null,
+    );
+    expect(then.test).toBe("facebook.com");
+  });
+});
+
 describe("what a turn decides", () => {
   it("asks for a test when the turn is an address, without needing a model", async () => {
     const out = await decide([{ role: "user", content: "acme.dev" }], null);

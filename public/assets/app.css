@@ -149,8 +149,24 @@ a { color: inherit; }
 .newchat:hover { border-color: var(--lav); }
 .newchat svg { width: 15px; height: 15px; }
 
+/* Nav rows: an icon and a word, the way a sidebar reads best. */
+.rail-nav { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; }
+.rail-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 9px;
+}
+.rail-nav a:hover { background: var(--edge-soft); color: var(--ink); }
+.rail-nav svg { width: 16px; height: 16px; flex: none; opacity: .85; }
+
+.recents-head { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); padding: 16px 10px 5px; }
 .past { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
-.past .when { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); padding: 12px 10px 4px; }
+.past .when { display: none; }
 .past a {
   display: block;
   font-size: 14px;
@@ -166,9 +182,24 @@ a { color: inherit; }
 .past a[aria-current="true"] { background: var(--lav-soft); color: var(--ink); }
 .past .none { font-size: 13.5px; color: var(--faint); padding: 8px 10px; }
 
-.rail-foot { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 10px 2px; border-top: 1px solid var(--edge-soft); }
-.rail-foot a { font-size: 12.5px; color: var(--faint); text-decoration: none; }
-.rail-foot a:hover { color: var(--muted); }
+.rail-foot { padding: 8px 0 0; border-top: 1px solid var(--edge-soft); }
+.railtheme {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  padding: 9px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.railtheme:hover { background: var(--edge-soft); color: var(--ink); }
+.railtheme svg { width: 16px; height: 16px; flex: none; }
 
 .rail-veil { display: none; }
 
@@ -211,14 +242,19 @@ main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .col { width: min(var(--col), 100%); margin: 0 auto; padding: 0 18px; }
 
 /*
- * Before the first message the greeting and the box sit together in the
- * middle. This is done by centring the scroller's own content rather than by
- * changing how it flexes - an earlier version set `flex: 0 0 auto` here, and
- * when the class was not cleared the thread grew past the window with nothing
- * able to scroll it. That was the page that "stopped halfway".
+ * Before the first message, the greeting and the box sit together in the
+ * middle of the screen, which is where every chat app puts them and where
+ * the eye goes first.
+ *
+ * The scroller stops taking all the height to allow it. That exact trick
+ * once broke the page: when the class was not cleared, the thread grew past
+ * the window with nothing able to scroll it. So `began()` clears the class
+ * from the class list itself rather than inferring it from the greeting, and
+ * `toBottom` re-checks the invariant on every message - a thread with
+ * children is never in the empty state.
  */
-.scroll.empty { display: flex; flex-direction: column; justify-content: flex-end; }
-.scroll.empty .col { padding-bottom: 4px; }
+main:has(.scroll.empty) { justify-content: center; padding-bottom: 6vh; }
+.scroll.empty { flex: 0 1 auto; overflow: hidden; }
 .hello { text-align: center; padding: 8px 0 22px; }
 .hello img { width: 62px; height: 62px; display: block; margin: 0 auto 14px; border-radius: 17px; }
 .hello h1 {
@@ -254,24 +290,56 @@ main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .turn.owly p { margin: 0 0 11px; }
 .turn.owly code { font-family: var(--mono); font-size: .88em; background: var(--edge-soft); padding: 1px 5px; border-radius: 5px; }
 
-/* The row of small actions under an Owly turn. */
-.acts { display: flex; gap: 2px; margin-top: 4px; opacity: 0; transition: opacity .13s ease; }
-.turn.owly:hover .acts, .acts:focus-within, .acts.stuck { opacity: 1; }
+/*
+ * The row of small actions under an Owly turn.
+ *
+ * They used to appear only on hover, which on a touch screen means never,
+ * and on a desktop means "I did not know those were there". They are always
+ * on the page now, just quiet until you go near them.
+ */
+.acts { display: flex; gap: 2px; margin-top: 6px; align-items: center; }
 .acts button {
   display: grid;
   place-items: center;
-  width: 27px;
-  height: 27px;
+  width: 28px;
+  height: 28px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--faint);
   cursor: pointer;
+  opacity: .55;
+  transition: opacity .15s ease, color .15s ease, background .15s ease, transform .12s ease;
 }
-.acts button:hover { color: var(--ink); background: var(--edge-soft); }
-.acts button svg { width: 14px; height: 14px; }
-.acts button.on { color: var(--lav); }
-.acts .said { font-size: 12px; color: var(--faint); align-self: center; padding-left: 4px; }
+.turn.owly:hover .acts button { opacity: .9; }
+.acts button:hover { opacity: 1; color: var(--ink); background: var(--edge-soft); transform: translateY(-1px); }
+.acts button:active { transform: scale(.88); }
+.acts button svg { width: 15px; height: 15px; }
+
+/* A press that answers back: the icon kicks, then settles. */
+.acts button.on { opacity: 1; color: var(--lav); background: var(--lav-soft); }
+.acts button.pop svg { animation: pop .34s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.35) rotate(-7deg); }
+  100% { transform: scale(1); }
+}
+.acts button.copied { color: var(--good); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .acts button.pop svg { animation: none; }
+  .acts button:hover, .acts button:active { transform: none; }
+}
+
+.acts .said {
+  font-size: 12px;
+  color: var(--faint);
+  align-self: center;
+  padding-left: 5px;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+.acts .said.show { opacity: 1; transform: none; }
 
 /* ----------------------------------------------------------- run in flight */
 

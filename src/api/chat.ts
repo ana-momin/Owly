@@ -152,6 +152,19 @@ export async function decide(history: ChatMessage[], report: string | null): Pro
 
   // Asking for a site to be tested is unambiguous enough to act on without a
   // model, and doing so keeps the common path fast and free.
+  if (site) {
+    const refusal = notYours(site);
+    if (refusal) return { reply: refusal, test: null, byModel: false };
+  }
+
+  // "It is mine" after Owly declined a well-known site. The refusal is a
+  // guess about ownership, and a guess has to be correctable by the person
+  // who actually knows - otherwise it is just a wall.
+  if (!site && MINE.test(last)) {
+    const declined = lastDeclined(history);
+    if (declined) return { reply: "", test: declined, byModel: false };
+  }
+
   if (site && !report) {
     return { reply: "", test: site, byModel: false };
   }
@@ -182,6 +195,62 @@ export async function decide(history: ChatMessage[], report: string | null): Pro
     clearTimeout(timer);
   }
   return { reply: fallback(last, report), test: null, byModel: false };
+}
+
+/**
+ * Sites nobody asking Owly a question owns.
+ *
+ * Someone typed facebook.com and Owly spent a minute reading it and handed
+ * back a report - and the report was useless, because you cannot fix
+ * Facebook's keyboard focus. Worse, it cost one of that visitor's three free
+ * tests to learn nothing. An agent worth the name knows the difference
+ * between a site you are asking about and a site you can act on.
+ *
+ * Deliberately a short list of the obvious ones rather than a clever guess.
+ * A wrong refusal is much more annoying than a wrong run: someone whose own
+ * product happens to be small and unknown must never be told it is not
+ * theirs. So this only ever names companies where the answer is not in doubt.
+ */
+const NOT_YOURS = [
+  "google", "youtube", "facebook", "instagram", "whatsapp", "x", "twitter", "tiktok", "linkedin",
+  "reddit", "wikipedia", "amazon", "apple", "microsoft", "netflix", "openai", "anthropic", "claude",
+  "github", "gitlab", "stackoverflow", "yahoo", "bing", "baidu", "spotify", "twitch", "discord",
+  "telegram", "snapchat", "pinterest", "paypal", "stripe", "shopify", "ebay", "zoom", "slack",
+  "notion", "figma", "canva", "dropbox", "vercel", "cloudflare", "meta", "xai", "deepseek",
+];
+
+/** The registrable-ish name: "www.facebook.com/x" -> "facebook". */
+function brandOf(site: string): string {
+  const host = site.replace(/^https?:\/\//i, "").split("/")[0]!.split(":")[0]!.toLowerCase();
+  const parts = host.replace(/^www\./, "").split(".");
+  // For "x.ai" that is "x"; for "google.co.uk" it is still "google".
+  return parts.length > 2 && parts[parts.length - 2] === "co" ? parts[parts.length - 3]! : parts[0]!;
+}
+
+export function notYours(site: string): string | null {
+  const brand = brandOf(site);
+  if (!NOT_YOURS.includes(brand)) return null;
+  const host = site.replace(/^https?:\/\//i, "").split("/")[0]!;
+  return (
+    `That is ${host}, which I am guessing is not yours to change.\n\n` +
+    `I could read its pages, but I would only be able to tell you about problems you cannot fix - and it would use one of your free tests to do it. ` +
+    `Give me your own site instead and I will open it as a new user would. If you want to watch me work first, try owly-demo-rho.vercel.app, which is broken on purpose.\n\n` +
+    `If ${host} really is yours, say so and I will run it.`
+  );
+}
+
+/** Someone telling Owly the site it declined really is theirs. */
+const MINE = /\b(it('?s| is)? ?mine|is mine|i own (it|that)|my (site|domain)|yes,? ?(it('?s| is)? ?mine)?|run it|do it anyway|go ahead)\b/i;
+
+/** The site named in the last refusal, so an owner can overrule it. */
+function lastDeclined(history: ChatMessage[]): string | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i]!;
+    if (m.role !== "assistant") continue;
+    const said = /^That is ([^,]+), which I am guessing is not yours/.exec(m.content);
+    if (said) return said[1]!.trim();
+  }
+  return null;
 }
 
 /** What Owly says when there is no model, or the model did not answer. */
