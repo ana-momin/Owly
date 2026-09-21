@@ -19,7 +19,9 @@
   --rail: #f2ebdb;
   --ink: #21203a;
   --muted: #605e80;
-  --faint: #8b89a6;
+  /* 4.79:1 on the rail, 5.05 on paper, 5.46 on the surface. The old
+     #8b89a6 was 2.84 and Owly failed its own site on it. */
+  --faint: #66647f;
   --lav: #8f6fd4;
   --lav-soft: #ece4fa;
   --edge: rgba(33, 32, 58, .10);
@@ -43,7 +45,7 @@
     --rail: #131223;
     --ink: #f2eee6;
     --muted: #b3b0c9;
-    --faint: #8886a3;
+    --faint: #9b99b5;
     --lav: #b79ce6;
     --lav-soft: #2b2749;
     --edge: rgba(242, 238, 230, .13);
@@ -58,7 +60,7 @@
   --rail: #131223;
   --ink: #f2eee6;
   --muted: #b3b0c9;
-  --faint: #8886a3;
+  --faint: #9b99b5;
   --lav: #b79ce6;
   --lav-soft: #2b2749;
   --edge: rgba(242, 238, 230, .13);
@@ -528,3 +530,6 @@ form.box textarea::placeholder { color: var(--faint); }
   border-radius: 12px;
 }
 .since .dot-good { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+
+/* Present for screen readers, gone for everyone else. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

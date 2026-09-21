@@ -19,14 +19,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/app.css">
-<script>
-  // Before first paint, so a dark-mode visitor never gets a white flash.
-  try {
-    var t = localStorage.getItem("owly-theme");
-    if (t) document.documentElement.setAttribute("data-theme", t);
-    if (localStorage.getItem("owly-rail") === "closed") document.documentElement.classList.add("rail-closed");
-  } catch (e) {}
-</script>
+<script src="/assets/boot.js"></script>
 </head>
 <body>
 
@@ -104,7 +97,7 @@
       <div class="dock">
         <div class="col">
           <form class="box" id="composer" autocomplete="off">
-            <label for="say" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Message Owly</label>
+            <label for="say" class="sr-only">Message Owly</label>
             <textarea id="say" rows="1" placeholder="Ask about a site, or paste a web address&hellip;"></textarea>
             <div class="box-foot">
               <span class="chip" id="left" title="Free tests left today">

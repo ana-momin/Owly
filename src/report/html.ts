@@ -29,11 +29,11 @@ const CSS = `
  * Same paper, same ink, same purple; and a dark scheme, because a bug report
  * gets opened at night.
  */
-:root{--paper:#f7f1e4;--card:#fffaf0;--ink:#21203a;--ink2:#4d4b6b;--dim:#7a7894;--line:rgba(33,32,58,.12);
+:root{--paper:#f7f1e4;--card:#fffaf0;--ink:#21203a;--ink2:#4d4b6b;--dim:#66647f;--line:rgba(33,32,58,.12);
 --accent:#7b5bc4;--good:#2f8f5b;--good-bg:#e6f4ec;--bad:#c2402c;--bad-bg:#fbeae6;--warn:#8a5a00;
 --crit:#b3261e;--high:#bf4408;--med:#8a6100;--low:#5b5975;--shadow:0 1px 2px rgba(20,20,30,.04),0 18px 36px -28px rgba(20,20,30,.28)}
 @media (prefers-color-scheme:dark){:root{
---paper:#17162a;--card:#1e1d34;--ink:#f2eee6;--ink2:#b3b0c9;--dim:#8886a3;--line:rgba(242,238,230,.14);
+--paper:#17162a;--card:#1e1d34;--ink:#f2eee6;--ink2:#b3b0c9;--dim:#9b99b5;--line:rgba(242,238,230,.14);
 --accent:#b79ce6;--good:#7fd2a3;--good-bg:#1d3329;--bad:#ef8a76;--bad-bg:#3a241f;
 --crit:#ef8a76;--high:#e8a06a;--med:#d9bd77;--low:#a5a2bd;--shadow:0 1px 2px rgba(0,0,0,.3),0 18px 36px -28px rgba(0,0,0,.6)}}
 *{box-sizing:border-box}
